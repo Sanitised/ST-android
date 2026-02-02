@@ -345,6 +345,9 @@ class NodeService : Service() {
             .setContentText(contentText)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setOngoing(status.state == NodeState.RUNNING || status.state == NodeState.STARTING)
+            .setOnlyAlertOnce(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setSilent(true)
             .addAction(android.R.drawable.ic_media_pause, "Stop", stopPending)
             .build()
     }
@@ -365,8 +368,11 @@ class NodeService : Service() {
         val channel = NotificationChannel(
             CHANNEL_ID,
             "Node service",
-            NotificationManager.IMPORTANCE_DEFAULT
+            NotificationManager.IMPORTANCE_LOW
         )
+        channel.enableVibration(false)
+        channel.setSound(null, null)
+        channel.setShowBadge(false)
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(channel)
     }
