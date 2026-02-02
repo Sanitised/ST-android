@@ -1,0 +1,6 @@
+[submodule "node"]
+	path = node
+	url = https://github.com/nodejs/node
+[submodule "SillyTavern"]
+	path = SillyTavern
+	url = https://github.com/SillyTavern/SillyTavern.git

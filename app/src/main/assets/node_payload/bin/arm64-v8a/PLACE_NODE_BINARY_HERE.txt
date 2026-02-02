@@ -1,0 +1,6 @@
+Place a built Node.js binary named "node" in this folder for arm64-v8a.
+
+Expected asset path:
+  app/src/main/assets/node_payload/bin/arm64-v8a/node
+
+Build script (to be added) will copy from node/out or node/dist into this location.
