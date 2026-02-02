@@ -1,13 +1,11 @@
 # ST-android
 
-Lightweight Android app that launches SillyTavern server on-device.
+SillyTavern app for Android. Works on device with zero setup. Supports Android 8.0+ and arm64.
 
-Functionality is minimal: start/stop, view logs, edit config, and export/import user data.
+Functionality: start/stop SillyTavern, view logs, edit config, and export/import user data.
 
 This is a personal project and is not affiliated with or endorsed by SillyTavern.
 It is intended primarily for basic on-device chatting; advanced workflows (for example, some extensions) may not work.
-
-Requires Android 8.0+ (API 26) and arm64 devices.
 
 ## Privacy
 
