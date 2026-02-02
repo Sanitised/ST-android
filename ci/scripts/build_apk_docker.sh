@@ -17,6 +17,30 @@ fi
 if [ -n "${VERSION_CODE:-}" ]; then
   DOCKER_ENV_ARGS+=(-e "VERSION_CODE=${VERSION_CODE}")
 fi
+if [ -n "${RELEASE_KEYSTORE_B64:-}" ]; then
+  DOCKER_ENV_ARGS+=(-e "RELEASE_KEYSTORE_B64=${RELEASE_KEYSTORE_B64}")
+fi
+if [ -n "${RELEASE_STORE_PASSWORD:-}" ]; then
+  DOCKER_ENV_ARGS+=(-e "RELEASE_STORE_PASSWORD=${RELEASE_STORE_PASSWORD}")
+fi
+if [ -n "${RELEASE_KEY_ALIAS:-}" ]; then
+  DOCKER_ENV_ARGS+=(-e "RELEASE_KEY_ALIAS=${RELEASE_KEY_ALIAS}")
+fi
+if [ -n "${RELEASE_KEY_PASSWORD:-}" ]; then
+  DOCKER_ENV_ARGS+=(-e "RELEASE_KEY_PASSWORD=${RELEASE_KEY_PASSWORD}")
+fi
+if [ -n "${GITHUB_REF_TYPE:-}" ]; then
+  DOCKER_ENV_ARGS+=(-e "GITHUB_REF_TYPE=${GITHUB_REF_TYPE}")
+fi
+if [ -n "${GITHUB_REF_NAME:-}" ]; then
+  DOCKER_ENV_ARGS+=(-e "GITHUB_REF_NAME=${GITHUB_REF_NAME}")
+fi
+if [ -n "${GITHUB_REF:-}" ]; then
+  DOCKER_ENV_ARGS+=(-e "GITHUB_REF=${GITHUB_REF}")
+fi
+if [ -n "${GITHUB_RUN_NUMBER:-}" ]; then
+  DOCKER_ENV_ARGS+=(-e "GITHUB_RUN_NUMBER=${GITHUB_RUN_NUMBER}")
+fi
 
 docker run --rm \
   -v "${ROOT_DIR}:/workspace" \
@@ -25,6 +49,17 @@ docker run --rm \
   "${IMAGE_NAME}" \
   bash -lc '\
     set -euo pipefail; \
+    BUILD_MODE="debug"; \
+    if [ -n "${RELEASE_KEYSTORE_B64:-}" ]; then \
+      mkdir -p ci/keystore; \
+      echo "$RELEASE_KEYSTORE_B64" | base64 -d > ci/keystore/release.jks; \
+      chmod 600 ci/keystore/release.jks; \
+      export RELEASE_STORE_FILE="/workspace/ci/keystore/release.jks"; \
+      if [ -z "${RELEASE_KEY_PASSWORD:-}" ] && [ -n "${RELEASE_STORE_PASSWORD:-}" ]; then \
+        export RELEASE_KEY_PASSWORD="$RELEASE_STORE_PASSWORD"; \
+      fi; \
+      BUILD_MODE="release"; \
+    fi; \
     NDK_ROOT="${ANDROID_NDK_HOME:-}"; \
     if [ -z "$NDK_ROOT" ]; then \
       NDK_ROOT="$(ls -d /opt/android-sdk/ndk/* 2>/dev/null | head -n1 || true)"; \
@@ -64,7 +99,38 @@ docker run --rm \
       app/src/main/jniLibs/arm64-v8a/libnode.so \
       app/src/main/jniLibs/arm64-v8a/libc++_shared.so; \
     bash ci/scripts/build_st_bundle.sh; \
-    gradle :app:assembleDebug \
+    if [ "$BUILD_MODE" = "release" ]; then \
+      gradle :app:assembleRelease; \
+    else \
+      gradle :app:assembleDebug; \
+    fi; \
   '
 
-printf '\nAPK: %s\n' "${ROOT_DIR}/app/build/outputs/apk/debug/app-debug.apk"
+APK_PATH=""
+if [ -f "${ROOT_DIR}/app/build/outputs/apk/release/app-release.apk" ]; then
+  APK_PATH="${ROOT_DIR}/app/build/outputs/apk/release/app-release.apk"
+elif [ -f "${ROOT_DIR}/app/build/outputs/apk/debug/app-debug.apk" ]; then
+  APK_PATH="${ROOT_DIR}/app/build/outputs/apk/debug/app-debug.apk"
+fi
+
+if [ -n "${APK_PATH}" ] && [[ "${APK_PATH}" == */release/* ]]; then
+  VERSION_LABEL="${VERSION_NAME:-}"
+  if [ -z "${VERSION_LABEL}" ] && [ -n "${GITHUB_REF_NAME:-}" ]; then
+    VERSION_LABEL="${GITHUB_REF_NAME#refs/tags/}"
+  fi
+  VERSION_LABEL="${VERSION_LABEL#v}"
+  if [ -n "${VERSION_LABEL}" ]; then
+    mkdir -p "${ROOT_DIR}/out"
+    RELEASE_NAME="ST-android-${VERSION_LABEL}.apk"
+    cp -f "${APK_PATH}" "${ROOT_DIR}/out/${RELEASE_NAME}"
+    printf '\nAPK: %s\n' "${ROOT_DIR}/out/${RELEASE_NAME}"
+    exit 0
+  fi
+fi
+
+if [ -n "${APK_PATH}" ]; then
+  printf '\nAPK: %s\n' "${APK_PATH}"
+else
+  printf '\nAPK not found\n'
+  exit 1
+fi

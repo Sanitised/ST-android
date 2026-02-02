@@ -3,22 +3,31 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-val fallbackVersionName = "0.1.1"
+val fallbackVersionName = "0.2.0"
 
 android {
     namespace = "io.github.sanitised.st"
     compileSdk = 36
 
+    fun envOrProp(name: String): String? =
+        (findProperty(name) as String?)?.takeIf { it.isNotBlank() }
+            ?: System.getenv(name)?.takeIf { it.isNotBlank() }
+
+    fun firstNonBlank(vararg values: String?): String? =
+        values.firstOrNull { !it.isNullOrBlank() }
+
+    val releaseStoreFile = envOrProp("RELEASE_STORE_FILE")
+    val releaseStorePassword = envOrProp("RELEASE_STORE_PASSWORD")
+    val releaseKeyAlias = envOrProp("RELEASE_KEY_ALIAS")
+    val releaseKeyPassword = firstNonBlank(envOrProp("RELEASE_KEY_PASSWORD"), releaseStorePassword)
+    val releaseSigningAvailable = !releaseStoreFile.isNullOrBlank()
+        && !releaseStorePassword.isNullOrBlank()
+        && !releaseKeyAlias.isNullOrBlank()
+
     defaultConfig {
         applicationId = "io.github.sanitised.st"
         minSdk = 26
         targetSdk = 36
-        fun envOrProp(name: String): String? =
-            (findProperty(name) as String?)?.takeIf { it.isNotBlank() }
-                ?: System.getenv(name)?.takeIf { it.isNotBlank() }
-
-        fun firstNonBlank(vararg values: String?): String? =
-            values.firstOrNull { !it.isNullOrBlank() }
 
         val githubTag = run {
             val refType = System.getenv("GITHUB_REF_TYPE")
@@ -48,12 +57,26 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            if (releaseSigningAvailable) {
+                storeFile = file(releaseStoreFile!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         debug {
             versionNameSuffix = "-dev"
         }
         release {
             isMinifyEnabled = false
+            if (releaseSigningAvailable) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
