@@ -43,6 +43,7 @@ if [ -n "${GITHUB_RUN_NUMBER:-}" ]; then
 fi
 
 docker run --rm \
+  -u "$(id -u):$(id -g)" \
   -v "${ROOT_DIR}:/workspace" \
   -w /workspace \
   "${DOCKER_ENV_ARGS[@]}" \
