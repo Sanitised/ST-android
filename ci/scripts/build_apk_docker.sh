@@ -57,6 +57,21 @@ docker run --rm \
     export ANDROID_PREFS_ROOT="/workspace/.android"; \
     export ANDROID_USER_HOME="/workspace/.android"; \
     mkdir -p "$HOME" "$NPM_CONFIG_CACHE" "$GRADLE_USER_HOME" "$ANDROID_SDK_HOME"; \
+    SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"; \
+    if [ -z "$SDK_ROOT" ]; then \
+      for candidate in /opt/android-sdk-linux /opt/android-sdk /usr/lib/android-sdk /sdk; do \
+        if [ -d "$candidate" ]; then \
+          SDK_ROOT="$candidate"; \
+          break; \
+        fi; \
+      done; \
+    fi; \
+    if [ -z "$SDK_ROOT" ]; then \
+      echo "Android SDK root not found in container"; \
+      exit 1; \
+    fi; \
+    export ANDROID_SDK_ROOT="$SDK_ROOT"; \
+    export ANDROID_HOME="$SDK_ROOT"; \
     BUILD_MODE="debug"; \
     if [ -n "${RELEASE_KEYSTORE_B64:-}" ]; then \
       mkdir -p ci/keystore; \
