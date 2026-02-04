@@ -50,6 +50,10 @@ docker run --rm \
   "${IMAGE_NAME}" \
   bash -lc '\
     set -euo pipefail; \
+    export HOME="${HOME:-/tmp}"; \
+    export NPM_CONFIG_CACHE="${NPM_CONFIG_CACHE:-/tmp/.npm}"; \
+    export GRADLE_USER_HOME="${GRADLE_USER_HOME:-/workspace/.gradle}"; \
+    mkdir -p "$HOME" "$NPM_CONFIG_CACHE" "$GRADLE_USER_HOME"; \
     BUILD_MODE="debug"; \
     if [ -n "${RELEASE_KEYSTORE_B64:-}" ]; then \
       mkdir -p ci/keystore; \

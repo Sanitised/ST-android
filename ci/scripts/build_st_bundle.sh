@@ -31,6 +31,9 @@ tar -C "${ST_DIR}" -cf - \
   | tar -C "${STAGE_DIR}" -xf -
 
 cd "${STAGE_DIR}"
+npm_cache_dir="${NPM_CONFIG_CACHE:-${TMPDIR:-/tmp}/.npm}"
+export NPM_CONFIG_CACHE="${npm_cache_dir}"
+mkdir -p "${npm_cache_dir}"
 npm ci --omit=dev --ignore-scripts
 
 "${SCRIPT_DIR}/audit_no_native_addons.sh" "${STAGE_DIR}"
