@@ -57,6 +57,15 @@ docker run --rm \
     export ANDROID_PREFS_ROOT="/workspace/.android"; \
     export ANDROID_USER_HOME="/workspace/.android"; \
     mkdir -p "$HOME" "$NPM_CONFIG_CACHE" "$GRADLE_USER_HOME" "$ANDROID_SDK_HOME"; \
+    if [ ! -d "$ANDROID_USER_HOME" ]; then \
+      echo "Android user home is not a directory: $ANDROID_USER_HOME"; \
+      exit 1; \
+    fi; \
+    if [ ! -w "$ANDROID_USER_HOME" ]; then \
+      echo "Android user home is not writable: $ANDROID_USER_HOME"; \
+      ls -ld "$ANDROID_USER_HOME" || true; \
+      exit 1; \
+    fi; \
     SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"; \
     if [ -z "$SDK_ROOT" ]; then \
       for candidate in /opt/android-sdk-linux /opt/android-sdk /usr/lib/android-sdk /sdk; do \
@@ -70,8 +79,19 @@ docker run --rm \
       echo "Android SDK root not found in container"; \
       exit 1; \
     fi; \
+    SDK_ROOT="$(readlink -f "$SDK_ROOT" 2>/dev/null || echo "$SDK_ROOT")"; \
     export ANDROID_SDK_ROOT="$SDK_ROOT"; \
     export ANDROID_HOME="$SDK_ROOT"; \
+    if [ ! -d "$ANDROID_SDK_ROOT" ]; then \
+      echo "Android SDK root is not a directory: $ANDROID_SDK_ROOT"; \
+      exit 1; \
+    fi; \
+    if [ ! -r "$ANDROID_SDK_ROOT" ]; then \
+      echo "Android SDK root is not readable: $ANDROID_SDK_ROOT"; \
+      ls -ld "$ANDROID_SDK_ROOT" || true; \
+      exit 1; \
+    fi; \
+    touch "$ANDROID_USER_HOME/repositories.cfg" 2>/dev/null || true; \
     BUILD_MODE="debug"; \
     if [ -n "${RELEASE_KEYSTORE_B64:-}" ]; then \
       mkdir -p ci/keystore; \
