@@ -55,7 +55,7 @@ docker run --rm \
     export GRADLE_USER_HOME="${GRADLE_USER_HOME:-/workspace/.gradle}"; \
     export ANDROID_USER_HOME="/workspace/.android"; \
     unset ANDROID_SDK_HOME ANDROID_PREFS_ROOT; \
-    mkdir -p "$HOME" "$NPM_CONFIG_CACHE" "$GRADLE_USER_HOME" "$ANDROID_SDK_HOME"; \
+    mkdir -p "$HOME" "$NPM_CONFIG_CACHE" "$GRADLE_USER_HOME" "$ANDROID_USER_HOME"; \
     if [ ! -d "$ANDROID_USER_HOME" ]; then \
       echo "Android user home is not a directory: $ANDROID_USER_HOME"; \
       exit 1; \
