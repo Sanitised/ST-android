@@ -92,6 +92,8 @@ docker run --rm \
       exit 1; \
     fi; \
     touch "$ANDROID_USER_HOME/repositories.cfg" 2>/dev/null || true; \
+    echo "Android SDK root: $ANDROID_SDK_ROOT"; \
+    echo "Android user home: $ANDROID_USER_HOME"; \
     BUILD_MODE="debug"; \
     if [ -n "${RELEASE_KEYSTORE_B64:-}" ]; then \
       mkdir -p ci/keystore; \
@@ -133,6 +135,15 @@ docker run --rm \
       find "$SYSROOT_LIB" -path "*/libc++_shared.so" -print || true; \
       exit 1; \
     fi; \
+    GRADLE_FLAGS="--stacktrace --no-daemon"; \
+    if [ -n "${GRADLE_INFO:-}" ]; then \
+      GRADLE_FLAGS="$GRADLE_FLAGS --info"; \
+    fi; \
+    if [ -n "${GRADLE_DEBUG:-}" ]; then \
+      GRADLE_FLAGS="$GRADLE_FLAGS --debug"; \
+    fi; \
+    echo "Gradle preflight: :app:tasks"; \
+    gradle :app:tasks $GRADLE_FLAGS; \
     python3 ci/scripts/check_elf_align.py "$TOOLCHAIN/bin/llvm-readelf" "$LIBCXX_PATH"; \
     ./tools/node/scripts/build_node_android.sh arm64; \
     mkdir -p app/src/main/jniLibs/arm64-v8a; \
@@ -143,9 +154,9 @@ docker run --rm \
       app/src/main/jniLibs/arm64-v8a/libc++_shared.so; \
     bash ci/scripts/build_st_bundle.sh; \
     if [ "$BUILD_MODE" = "release" ]; then \
-      gradle :app:assembleRelease; \
+      gradle :app:assembleRelease $GRADLE_FLAGS; \
     else \
-      gradle :app:assembleDebug; \
+      gradle :app:assembleDebug $GRADLE_FLAGS; \
     fi; \
   '
 
