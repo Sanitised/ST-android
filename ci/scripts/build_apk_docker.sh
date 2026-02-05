@@ -56,43 +56,7 @@ docker run --rm \
     export ANDROID_USER_HOME="/workspace/.android"; \
     unset ANDROID_SDK_HOME ANDROID_PREFS_ROOT; \
     mkdir -p "$HOME" "$NPM_CONFIG_CACHE" "$GRADLE_USER_HOME" "$ANDROID_USER_HOME"; \
-    if [ ! -d "$ANDROID_USER_HOME" ]; then \
-      echo "Android user home is not a directory: $ANDROID_USER_HOME"; \
-      exit 1; \
-    fi; \
-    if [ ! -w "$ANDROID_USER_HOME" ]; then \
-      echo "Android user home is not writable: $ANDROID_USER_HOME"; \
-      ls -ld "$ANDROID_USER_HOME" || true; \
-      exit 1; \
-    fi; \
-    SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"; \
-    if [ -z "$SDK_ROOT" ]; then \
-      for candidate in /opt/android-sdk-linux /opt/android-sdk /usr/lib/android-sdk /sdk; do \
-        if [ -d "$candidate" ]; then \
-          SDK_ROOT="$candidate"; \
-          break; \
-        fi; \
-      done; \
-    fi; \
-    if [ -z "$SDK_ROOT" ]; then \
-      echo "Android SDK root not found in container"; \
-      exit 1; \
-    fi; \
-    SDK_ROOT="$(readlink -f "$SDK_ROOT" 2>/dev/null || echo "$SDK_ROOT")"; \
-    export ANDROID_SDK_ROOT="$SDK_ROOT"; \
-    export ANDROID_HOME="$SDK_ROOT"; \
-    if [ ! -d "$ANDROID_SDK_ROOT" ]; then \
-      echo "Android SDK root is not a directory: $ANDROID_SDK_ROOT"; \
-      exit 1; \
-    fi; \
-    if [ ! -r "$ANDROID_SDK_ROOT" ]; then \
-      echo "Android SDK root is not readable: $ANDROID_SDK_ROOT"; \
-      ls -ld "$ANDROID_SDK_ROOT" || true; \
-      exit 1; \
-    fi; \
     touch "$ANDROID_USER_HOME/repositories.cfg" 2>/dev/null || true; \
-    echo "Android SDK root: $ANDROID_SDK_ROOT"; \
-    echo "Android user home: $ANDROID_USER_HOME"; \
     BUILD_MODE="debug"; \
     if [ -n "${RELEASE_KEYSTORE_B64:-}" ]; then \
       mkdir -p ci/keystore; \
@@ -130,19 +94,9 @@ docker run --rm \
     fi; \
     if [ ! -f "$LIBCXX_PATH" ]; then \
       echo "Expected libc++_shared.so not found for $ABI_TRIPLE (API $ANDROID_API) under $SYSROOT_LIB"; \
-      echo "Candidates under sysroot:"; \
       find "$SYSROOT_LIB" -path "*/libc++_shared.so" -print || true; \
       exit 1; \
     fi; \
-    GRADLE_FLAGS="--stacktrace --no-daemon"; \
-    if [ -n "${GRADLE_INFO:-}" ]; then \
-      GRADLE_FLAGS="$GRADLE_FLAGS --info"; \
-    fi; \
-    if [ -n "${GRADLE_DEBUG:-}" ]; then \
-      GRADLE_FLAGS="$GRADLE_FLAGS --debug"; \
-    fi; \
-    echo "Gradle preflight: :app:tasks"; \
-    gradle :app:tasks $GRADLE_FLAGS; \
     python3 ci/scripts/check_elf_align.py "$TOOLCHAIN/bin/llvm-readelf" "$LIBCXX_PATH"; \
     ./tools/node/scripts/build_node_android.sh arm64; \
     mkdir -p app/src/main/jniLibs/arm64-v8a; \
@@ -153,9 +107,9 @@ docker run --rm \
       app/src/main/jniLibs/arm64-v8a/libc++_shared.so; \
     bash ci/scripts/build_st_bundle.sh; \
     if [ "$BUILD_MODE" = "release" ]; then \
-      gradle :app:assembleRelease $GRADLE_FLAGS; \
+      gradle :app:assembleRelease --stacktrace --no-daemon; \
     else \
-      gradle :app:assembleDebug $GRADLE_FLAGS; \
+      gradle :app:assembleDebug --stacktrace --no-daemon; \
     fi; \
   '
 

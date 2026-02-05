@@ -26,4 +26,7 @@ RUN curl -fsSL "https://services.gradle.org/distributions/gradle-${GRADLE_VERSIO
 
 ENV PATH="/opt/gradle/gradle-${GRADLE_VERSION}/bin:${PATH}"
 
+RUN yes | sdkmanager --licenses > /dev/null 2>&1 || true \
+    && sdkmanager "build-tools;34.0.0"
+
 WORKDIR /workspace
