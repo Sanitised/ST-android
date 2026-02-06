@@ -250,7 +250,7 @@ class MainActivity : ComponentActivity() {
                         title = { Text(text = "Import backup?") },
                         text = {
                             Text(
-                                text = "YOUR EXISTING DATA WILL BE OVERRIDDEN. " +
+                                text = "YOUR EXISTING DATA WILL BE OVERWRITTEN. " +
                                         "Make sure the server is stopped before importing."
                             )
                         },

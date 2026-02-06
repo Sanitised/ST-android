@@ -108,15 +108,18 @@ class NodeService : Service() {
                     NodeState.ERROR,
                     layoutResult.exceptionOrNull()?.message ?: "Extraction failed"
                 )
+                stopForeground(STOP_FOREGROUND_REMOVE)
                 return
             }
             layoutResult.getOrThrow()
         } catch (e: Exception) {
             updateStatus(NodeState.ERROR, e.message ?: "Extraction failed")
+            stopForeground(STOP_FOREGROUND_REMOVE)
             return
         }
         if (!layout.nodeBin.exists()) {
             updateStatus(NodeState.ERROR, "Node binary not found. Add assets/node_payload/bin/<abi>/node")
+            stopForeground(STOP_FOREGROUND_REMOVE)
             return
         }
         if (stopRequested) {
@@ -243,6 +246,7 @@ class NodeService : Service() {
             }
             updateStatus(NodeState.STOPPED, "Stopped")
             stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
         }
     }
 
@@ -270,6 +274,7 @@ class NodeService : Service() {
                 }
             }
             stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
         }
     }
 
@@ -332,6 +337,16 @@ class NodeService : Service() {
     }
 
     private fun buildNotification(contentText: String): Notification {
+        val openIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        val openPending = PendingIntent.getActivity(
+            this,
+            0,
+            openIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val stopIntent = Intent(this, NodeService::class.java).apply { action = ACTION_STOP }
         val stopPending = PendingIntent.getService(
             this,
@@ -343,6 +358,7 @@ class NodeService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("SillyTavern Node")
             .setContentText(contentText)
+            .setContentIntent(openPending)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setOngoing(status.state == NodeState.RUNNING || status.state == NodeState.STARTING)
             .setOnlyAlertOnce(true)
