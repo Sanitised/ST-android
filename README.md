@@ -14,10 +14,9 @@ It is intended primarily for basic on-device chatting; advanced workflows (for e
 - Unlike Termux, app works in Private Space/Secure Folder/Secondary profiles.
 - All chats, characters, settings stay local unless you decide to export them manually and share with others.
 - Bundles SillyTavern source code without modifications.
-- Bundles Node.js with only the minimal patches required to run on Android.
+- Bundles Node.js with minimal patches required to run on Android.
 - The codebase is intentionally small and easy to review manually or with a coding agent.
-
-APKs are built in the pipeline and published automatically.
+- Release APKs are built in the pipeline and published through immutable releases.
 
 ## Changelog
 
