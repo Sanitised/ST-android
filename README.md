@@ -16,7 +16,7 @@ It is intended primarily for basic on-device chatting; advanced workflows (for e
 - Bundles SillyTavern source code without modifications.
 - Bundles Node.js with minimal patches required to run on Android.
 - The codebase is intentionally small and easy to review manually or with a coding agent.
-- Release APKs are built in the pipeline and published through immutable releases.
+- Release APKs are built in the pipeline and published automatically through immutable releases.
 
 ## Changelog
 
