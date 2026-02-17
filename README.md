@@ -2,7 +2,7 @@
 
 SillyTavern app for Android. Works on device with zero setup. Supports Android 8.0+ and arm64.
 
-Functionality: start/stop SillyTavern, view logs, edit config, and export/import user data.
+![Screenshot](pics/ST-android-screenshot.png)
 
 This is a personal project and is not affiliated with or endorsed by SillyTavern.
 It is intended primarily for basic on-device chatting; advanced workflows (for example, some extensions) may not work.
