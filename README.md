@@ -2,7 +2,7 @@
 
 SillyTavern app for Android. Works on device with zero setup. Supports Android 8.0+ and arm64.
 
-![Screenshot](pics/ST-android-screenshot.png)
+<img src="pics/ST-android-screenshot.png" alt="Screenshot" width="300">
 
 This is a personal project and is not affiliated with or endorsed by SillyTavern.
 It is intended primarily for basic on-device chatting; advanced workflows (for example, some extensions) may not work.
