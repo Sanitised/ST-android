@@ -20,7 +20,7 @@ It is intended primarily for basic on-device chatting; advanced workflows (for e
 
 ## Changelog
 
-See `CHANGELOG.md`.
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## Build (Docker)
 
