@@ -18,6 +18,30 @@ It is intended primarily for basic on-device chatting; advanced workflows (for e
 - The codebase is intentionally small and easy to review manually or with a coding agent.
 - Release APKs are built in the pipeline and published automatically through immutable releases.
 
+## Importing data from SillyTavern on Termux/PC
+
+Pack your SillyTavern `data/` folder (and optionally `config.yaml`) into an `.tar.gz` archive with this structure:
+
+```
+st_backup/
+├── config.yaml
+└── data/
+```
+
+Termux commands:
+```bash
+mkdir st_backup
+cp /path/to/sillytavern/config.yaml st_backup/
+cp -r /path/to/sillytavern/data st_backup/
+tar -czf st_backup.tar.gz st_backup/
+# Getting archive out of Termix
+termux-setup-storage
+# Grant storage permission
+cp st_backup.tar.gz ~/storage/downloads/
+```
+
+Then stop the server in the app and use **Import Data**.
+
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md).
