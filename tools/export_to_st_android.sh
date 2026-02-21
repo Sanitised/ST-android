@@ -139,8 +139,14 @@ if is_termux; then
         echo ""
         read -r -p "  Press Enter to continue…"
         termux-setup-storage
-        # Give the OS a moment to mount the shared storage symlink.
-        sleep 2
+        # Poll until ~/storage symlink appears (user tapped Allow) or 60 s timeout.
+        echo -n "  Waiting for permission"
+        for _ in $(seq 1 60); do
+            if [ -d "$DOWNLOADS_DIR" ]; then break; fi
+            echo -n "."
+            sleep 1
+        done
+        echo ""
     fi
 
     if [ -d "$DOWNLOADS_DIR" ]; then
