@@ -81,6 +81,42 @@ fun AdvancedScreen(
                     .verticalScroll(scrollState)
                     .padding(horizontal = 20.dp, vertical = 20.dp)
             ) {
+                val buttonsEnabled = !serverRunning && !isCustomInstalling
+                Text(
+                    text = "User Data",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Permanently delete all chats, characters, presets, worlds, " +
+                            "settings, and other user data stored by the app.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = onRemoveUserData,
+                    enabled = buttonsEnabled,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(text = "Remove All User Data")
+                }
+                if (removeDataStatus.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = removeDataStatus,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = "Custom SillyTavern Version",
                     style = MaterialTheme.typography.titleMedium,
@@ -158,7 +194,6 @@ fun AdvancedScreen(
                     )
                 }
                 Spacer(modifier = Modifier.height(12.dp))
-                val buttonsEnabled = !serverRunning && !isCustomInstalling
                 Button(
                     onClick = onLoadCustomZip,
                     enabled = buttonsEnabled,
@@ -180,41 +215,6 @@ fun AdvancedScreen(
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         text = customStatus,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Spacer(modifier = Modifier.height(24.dp))
-                HorizontalDivider()
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "User Data",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Permanently delete all chats, characters, presets, worlds, " +
-                            "settings, and other user data stored by the app.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                OutlinedButton(
-                    onClick = onRemoveUserData,
-                    enabled = buttonsEnabled,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(text = "Remove All User Data")
-                }
-                if (removeDataStatus.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = removeDataStatus,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
