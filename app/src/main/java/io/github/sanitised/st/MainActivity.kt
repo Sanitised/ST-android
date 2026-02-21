@@ -84,6 +84,7 @@ class MainActivity : ComponentActivity() {
             val showConfigState = remember { mutableStateOf(false) }
             val showLegalState = remember { mutableStateOf(false) }
             val showLicenseState = remember { mutableStateOf<LegalDoc?>(null) }
+            val showAdvancedState = remember { mutableStateOf(false) }
             val stdoutState = remember { mutableStateOf("") }
             val stderrState = remember { mutableStateOf("") }
             val serviceState = remember { mutableStateOf("") }
@@ -93,7 +94,6 @@ class MainActivity : ComponentActivity() {
             val isCustomInstalledState = remember { mutableStateOf(NodePayload(this@MainActivity).isCustomInstalled()) }
             val isCustomInstallingState = remember { mutableStateOf(false) }
             val customStatusState = remember { mutableStateOf("") }
-            val showCustomWarning = remember { mutableStateOf(false) }
             val showResetConfirm = remember { mutableStateOf(false) }
             val notificationGrantedState = remember { mutableStateOf(isNotificationPermissionGranted()) }
             val lifecycleOwner = LocalLifecycleOwner.current
@@ -165,246 +165,232 @@ class MainActivity : ComponentActivity() {
                 )
             }
 
-            if (showLogsState.value) {
-                BackHandler { showLogsState.value = false }
-                LogsScreen(
-                    onBack = { showLogsState.value = false },
-                    stdoutLog = stdoutState.value,
-                    stderrLog = stderrState.value,
-                    serviceLog = serviceState.value
-                )
-            } else if (showLicenseState.value != null) {
-                val doc = showLicenseState.value
-                if (doc != null) {
+            // Launchers must live at the top level, outside any conditional branches
+            val exportLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.CreateDocument("application/gzip")
+            ) { uri ->
+                if (uri == null) return@rememberLauncherForActivityResult
+                backupStatusState.value = "Exporting..."
+                scope.launch {
+                    val result = withContext(Dispatchers.IO) {
+                        NodeBackup.exportToUri(this@MainActivity, uri)
+                    }
+                    backupStatusState.value = result.getOrElse { "Export failed: ${it.message ?: "unknown error"}" }
+                }
+            }
+            val importLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.OpenDocument()
+            ) { uri ->
+                if (uri == null) return@rememberLauncherForActivityResult
+                pendingImportUri.value = uri
+                showImportConfirm.value = true
+            }
+            val customZipLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.OpenDocument()
+            ) { uri ->
+                if (uri == null) return@rememberLauncherForActivityResult
+                isCustomInstallingState.value = true
+                customStatusState.value = "Starting…"
+                scope.launch {
+                    val payload = NodePayload(this@MainActivity)
+                    val result = withContext(Dispatchers.IO) {
+                        payload.installCustomFromZip(uri) { msg ->
+                            scope.launch(Dispatchers.Main) {
+                                customStatusState.value = msg
+                            }
+                        }
+                    }
+                    isCustomInstalledState.value = payload.isCustomInstalled()
+                    isCustomInstallingState.value = false
+                    customStatusState.value = result.fold(
+                        onSuccess = { "Custom ST installed successfully." },
+                        onFailure = { "Installation failed: ${it.message ?: "unknown error"}" }
+                    )
+                }
+            }
+
+            // Screen routing
+            when {
+                showLogsState.value -> {
+                    BackHandler { showLogsState.value = false }
+                    LogsScreen(
+                        onBack = { showLogsState.value = false },
+                        stdoutLog = stdoutState.value,
+                        stderrLog = stderrState.value,
+                        serviceLog = serviceState.value
+                    )
+                }
+                showLicenseState.value != null -> {
+                    val doc = showLicenseState.value!!
                     BackHandler { showLicenseState.value = null }
                     LicenseTextScreen(
                         onBack = { showLicenseState.value = null },
                         doc = doc
                     )
                 }
-            } else if (showLegalState.value) {
-                BackHandler { showLegalState.value = false }
-                LegalScreen(
-                    onBack = { showLegalState.value = false },
-                    onOpenUrl = { url -> openUrl(url) },
-                    legalDocs = legalDocs,
-                    onOpenLicense = { doc -> showLicenseState.value = doc }
-                )
-            } else if (showConfigState.value) {
-                BackHandler { showConfigState.value = false }
-                ConfigScreen(
-                    onBack = { showConfigState.value = false },
-                    onOpenDocs = { openConfigDocs() },
-                    canEdit = statusState.value.state == NodeState.STOPPED || statusState.value.state == NodeState.ERROR,
-                    configFile = AppPaths(this).configFile
-                )
-            } else {
-                val exportLauncher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.CreateDocument("application/gzip")
-                ) { uri ->
-                    if (uri == null) return@rememberLauncherForActivityResult
-                    backupStatusState.value = "Exporting..."
-                    scope.launch {
-                        val result = withContext(Dispatchers.IO) {
-                            NodeBackup.exportToUri(this@MainActivity, uri)
-                        }
-                        backupStatusState.value = result.getOrElse { "Export failed: ${it.message ?: "unknown error"}" }
-                    }
+                showLegalState.value -> {
+                    BackHandler { showLegalState.value = false }
+                    LegalScreen(
+                        onBack = { showLegalState.value = false },
+                        onOpenUrl = { url -> openUrl(url) },
+                        legalDocs = legalDocs,
+                        onOpenLicense = { doc -> showLicenseState.value = doc }
+                    )
                 }
-                val importLauncher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.OpenDocument()
-                ) { uri ->
-                    if (uri == null) return@rememberLauncherForActivityResult
-                    pendingImportUri.value = uri
-                    showImportConfirm.value = true
+                showConfigState.value -> {
+                    BackHandler { showConfigState.value = false }
+                    ConfigScreen(
+                        onBack = { showConfigState.value = false },
+                        onOpenDocs = { openConfigDocs() },
+                        canEdit = statusState.value.state == NodeState.STOPPED || statusState.value.state == NodeState.ERROR,
+                        configFile = AppPaths(this).configFile
+                    )
                 }
-                val customZipLauncher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.OpenDocument()
-                ) { uri ->
-                    if (uri == null) return@rememberLauncherForActivityResult
-                    isCustomInstallingState.value = true
-                    customStatusState.value = "Starting…"
-                    scope.launch {
-                        val payload = NodePayload(this@MainActivity)
-                        val result = withContext(Dispatchers.IO) {
-                            payload.installCustomFromZip(uri) { msg ->
-                                scope.launch(Dispatchers.Main) {
-                                    customStatusState.value = msg
-                                }
-                            }
-                        }
-                        isCustomInstalledState.value = payload.isCustomInstalled()
-                        isCustomInstallingState.value = false
-                        customStatusState.value = result.fold(
-                            onSuccess = { "Custom ST installed successfully." },
-                            onFailure = { "Installation failed: ${it.message ?: "unknown error"}" }
-                        )
-                    }
-                }
-                STAndroidApp(
-                    status = statusState.value,
-                    onStart = { startNode() },
-                    onStop = { stopNode() },
-                    onOpen = { openNodeUi(statusState.value.port) },
-                    onShowLogs = { showLogsState.value = true },
-                    onOpenNotificationSettings = { openNotificationSettings() },
-                    onEditConfig = { showConfigState.value = true },
-                    showNotificationPrompt = !notificationGrantedState.value,
-                    onExport = {
-                        val stamp = LocalDateTime.now()
-                            .format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
-                        exportLauncher.launch("sillytavern-backup-$stamp.tar.gz")
-                    },
-                    onImport = {
-                        importLauncher.launch(
-                            arrayOf(
-                                "application/gzip",
-                                "application/x-gzip",
-                                "application/octet-stream",
-                                "application/x-tar"
-                            )
-                        )
-                    },
-                    backupStatus = backupStatusState.value,
-                    versionLabel = versionLabel,
-                    stLabel = if (isCustomInstalledState.value) "SillyTavern (custom)" else stLabel,
-                    nodeLabel = nodeLabel,
-                    symlinkSupported = symlinkSupported,
-                    onShowLegal = { showLegalState.value = true },
-                    isCustomInstalled = isCustomInstalledState.value,
-                    isCustomInstalling = isCustomInstallingState.value,
-                    customStatus = customStatusState.value,
-                    onLoadCustomZip = { showCustomWarning.value = true },
-                    onResetToDefault = { showResetConfirm.value = true }
-                )
-                if (showCustomWarning.value) {
-                    androidx.compose.material3.AlertDialog(
-                        onDismissRequest = { showCustomWarning.value = false },
-                        title = { Text(text = "Load custom SillyTavern?") },
-                        text = {
-                            Text(
-                                text = "You are about to replace the bundled SillyTavern with " +
-                                    "a version you provide.\n\n" +
-                                    "BACK UP YOUR DATA FIRST (use Export Data).\n\n" +
-                                    "Only load archives from sources you trust. Lifecycle " +
-                                    "scripts are blocked during install (--ignore-scripts), " +
-                                    "but you are responsible for the code you run.\n\n" +
-                                    "The server must be stopped before continuing.\n\n" +
-                                    "Select a SillyTavern source ZIP (e.g. the \"Source code\" " +
-                                    "zip from a GitHub release)."
-                            )
-                        },
-                        confirmButton = {
-                            Button(onClick = {
-                                showCustomWarning.value = false
-                                customZipLauncher.launch(
-                                    arrayOf(
-                                        "application/zip",
-                                        "application/x-zip-compressed",
-                                        "application/octet-stream"
-                                    )
+                showAdvancedState.value -> {
+                    BackHandler { showAdvancedState.value = false }
+                    AdvancedScreen(
+                        onBack = { showAdvancedState.value = false },
+                        isCustomInstalled = isCustomInstalledState.value,
+                        isCustomInstalling = isCustomInstallingState.value,
+                        customStatus = customStatusState.value,
+                        serverRunning = statusState.value.state == NodeState.RUNNING ||
+                            statusState.value.state == NodeState.STARTING,
+                        onLoadCustomZip = {
+                            customZipLauncher.launch(
+                                arrayOf(
+                                    "application/zip",
+                                    "application/x-zip-compressed",
+                                    "application/octet-stream"
                                 )
-                            }) {
-                                Text(text = "I understand, pick ZIP")
-                            }
-                        },
-                        dismissButton = {
-                            Button(onClick = { showCustomWarning.value = false }) {
-                                Text(text = "Cancel")
-                            }
-                        }
-                    )
-                }
-                if (showResetConfirm.value) {
-                    androidx.compose.material3.AlertDialog(
-                        onDismissRequest = { showResetConfirm.value = false },
-                        title = { Text(text = "Reset to default?") },
-                        text = {
-                            Text(
-                                text = "This will reinstall the SillyTavern version bundled " +
-                                    "with the app. Your data (chats, characters, settings) " +
-                                    "will not be affected."
                             )
                         },
-                        confirmButton = {
-                            Button(onClick = {
-                                showResetConfirm.value = false
-                                isCustomInstallingState.value = true
-                                customStatusState.value = "Resetting…"
-                                scope.launch {
-                                    val payload = NodePayload(this@MainActivity)
-                                    val result = withContext(Dispatchers.IO) {
-                                        payload.resetToDefault()
-                                    }
-                                    isCustomInstalledState.value = payload.isCustomInstalled()
-                                    isCustomInstallingState.value = false
-                                    customStatusState.value = result.fold(
-                                        onSuccess = { "Reset to default complete." },
-                                        onFailure = { "Reset failed: ${it.message ?: "unknown error"}" }
-                                    )
-                                }
-                            }) {
-                                Text(text = "Reset")
-                            }
-                        },
-                        dismissButton = {
-                            Button(onClick = { showResetConfirm.value = false }) {
-                                Text(text = "Cancel")
-                            }
-                        }
+                        onResetToDefault = { showResetConfirm.value = true }
                     )
                 }
-                if (showImportConfirm.value) {
-                    androidx.compose.material3.AlertDialog(
-                        onDismissRequest = { showImportConfirm.value = false },
-                        title = { Text(text = "Import backup?") },
-                        text = {
-                            Text(
-                                text = "YOUR EXISTING DATA WILL BE OVERWRITTEN. " +
-                                        "Make sure the server is stopped before importing."
+                else -> {
+                    STAndroidApp(
+                        status = statusState.value,
+                        onStart = { startNode() },
+                        onStop = { stopNode() },
+                        onOpen = { openNodeUi(statusState.value.port) },
+                        onShowLogs = { showLogsState.value = true },
+                        onOpenNotificationSettings = { openNotificationSettings() },
+                        onEditConfig = { showConfigState.value = true },
+                        showNotificationPrompt = !notificationGrantedState.value,
+                        onExport = {
+                            val stamp = LocalDateTime.now()
+                                .format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
+                            exportLauncher.launch("sillytavern-backup-$stamp.tar.gz")
+                        },
+                        onImport = {
+                            importLauncher.launch(
+                                arrayOf(
+                                    "application/gzip",
+                                    "application/x-gzip",
+                                    "application/octet-stream",
+                                    "application/x-tar"
+                                )
                             )
                         },
-                        confirmButton = {
-                            Button(onClick = {
-                                val uri = pendingImportUri.value
-                                showImportConfirm.value = false
-                                pendingImportUri.value = null
-                                if (uri == null) return@Button
-                                backupStatusState.value = "Importing..."
-                                scope.launch {
-                                    val importResult = withContext(Dispatchers.IO) {
-                                        NodeBackup.importFromUri(this@MainActivity, uri)
-                                    }
-                                    val postInstallResult = if (importResult.isSuccess) {
-                                        val serviceResult = nodeServiceState.value?.runPostInstallNow()
-                                        serviceResult ?: Result.failure(IllegalStateException("Service not available"))
-                                    } else {
-                                        Result.success(Unit)
-                                    }
-                                    backupStatusState.value = when {
-                                        importResult.isFailure ->
-                                            "Import failed: ${importResult.exceptionOrNull()?.message ?: "unknown error"}"
-
-                                        postInstallResult.isFailure ->
-                                            "Import complete, post-install failed: ${postInstallResult.exceptionOrNull()?.message ?: "unknown error"}"
-
-                                        else -> "Import complete"
-                                    }
-                                }
-                            }) {
-                                Text(text = "Import")
-                            }
-                        },
-                        dismissButton = {
-                            Button(onClick = {
-                                showImportConfirm.value = false
-                                pendingImportUri.value = null
-                            }) {
-                                Text(text = "Cancel")
-                            }
-                        }
+                        backupStatus = backupStatusState.value,
+                        versionLabel = versionLabel,
+                        stLabel = if (isCustomInstalledState.value) "SillyTavern (custom version)" else stLabel,
+                        nodeLabel = nodeLabel,
+                        symlinkSupported = symlinkSupported,
+                        onShowLegal = { showLegalState.value = true },
+                        onShowAdvanced = { showAdvancedState.value = true }
                     )
                 }
+            }
+
+            // Dialogs overlay whichever screen is active
+            if (showResetConfirm.value) {
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { showResetConfirm.value = false },
+                    title = { Text(text = "Reset to default?") },
+                    text = {
+                        Text(
+                            text = "This will reinstall the SillyTavern version bundled " +
+                                "with the app. Your data (chats, characters, settings) " +
+                                "will not be affected."
+                        )
+                    },
+                    confirmButton = {
+                        Button(onClick = {
+                            showResetConfirm.value = false
+                            isCustomInstallingState.value = true
+                            customStatusState.value = "Resetting…"
+                            scope.launch {
+                                val payload = NodePayload(this@MainActivity)
+                                val result = withContext(Dispatchers.IO) {
+                                    payload.resetToDefault()
+                                }
+                                isCustomInstalledState.value = payload.isCustomInstalled()
+                                isCustomInstallingState.value = false
+                                customStatusState.value = result.fold(
+                                    onSuccess = { "Reset to default complete." },
+                                    onFailure = { "Reset failed: ${it.message ?: "unknown error"}" }
+                                )
+                            }
+                        }) {
+                            Text(text = "Reset")
+                        }
+                    },
+                    dismissButton = {
+                        Button(onClick = { showResetConfirm.value = false }) {
+                            Text(text = "Cancel")
+                        }
+                    }
+                )
+            }
+            if (showImportConfirm.value) {
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { showImportConfirm.value = false },
+                    title = { Text(text = "Import backup?") },
+                    text = {
+                        Text(
+                            text = "YOUR EXISTING DATA WILL BE OVERWRITTEN. " +
+                                "Make sure the server is stopped before importing."
+                        )
+                    },
+                    confirmButton = {
+                        Button(onClick = {
+                            val uri = pendingImportUri.value
+                            showImportConfirm.value = false
+                            pendingImportUri.value = null
+                            if (uri == null) return@Button
+                            backupStatusState.value = "Importing..."
+                            scope.launch {
+                                val importResult = withContext(Dispatchers.IO) {
+                                    NodeBackup.importFromUri(this@MainActivity, uri)
+                                }
+                                val postInstallResult = if (importResult.isSuccess) {
+                                    val serviceResult = nodeServiceState.value?.runPostInstallNow()
+                                    serviceResult ?: Result.failure(IllegalStateException("Service not available"))
+                                } else {
+                                    Result.success(Unit)
+                                }
+                                backupStatusState.value = when {
+                                    importResult.isFailure ->
+                                        "Import failed: ${importResult.exceptionOrNull()?.message ?: "unknown error"}"
+                                    postInstallResult.isFailure ->
+                                        "Import complete, post-install failed: ${postInstallResult.exceptionOrNull()?.message ?: "unknown error"}"
+                                    else -> "Import complete"
+                                }
+                            }
+                        }) {
+                            Text(text = "Import")
+                        }
+                    },
+                    dismissButton = {
+                        Button(onClick = {
+                            showImportConfirm.value = false
+                            pendingImportUri.value = null
+                        }) {
+                            Text(text = "Cancel")
+                        }
+                    }
+                )
             }
         }
     }
@@ -501,18 +487,9 @@ class MainActivity : ComponentActivity() {
         } catch (_: Exception) {
             false
         } finally {
-            try {
-                link.delete()
-            } catch (_: Exception) {
-            }
-            try {
-                target.delete()
-            } catch (_: Exception) {
-            }
-            try {
-                dir.delete()
-            } catch (_: Exception) {
-            }
+            try { link.delete() } catch (_: Exception) { }
+            try { target.delete() } catch (_: Exception) { }
+            try { dir.delete() } catch (_: Exception) { }
         }
     }
 }
