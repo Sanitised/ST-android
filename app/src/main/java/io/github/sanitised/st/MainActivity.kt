@@ -95,6 +95,8 @@ class MainActivity : ComponentActivity() {
             val isCustomInstallingState = remember { mutableStateOf(false) }
             val customStatusState = remember { mutableStateOf("") }
             val showResetConfirm = remember { mutableStateOf(false) }
+            val showRemoveDataConfirm = remember { mutableStateOf(false) }
+            val removeDataStatusState = remember { mutableStateOf("") }
             val notificationGrantedState = remember { mutableStateOf(isNotificationPermissionGranted()) }
             val lifecycleOwner = LocalLifecycleOwner.current
             val scope = rememberCoroutineScope()
@@ -264,7 +266,9 @@ class MainActivity : ComponentActivity() {
                                 )
                             )
                         },
-                        onResetToDefault = { showResetConfirm.value = true }
+                        onResetToDefault = { showResetConfirm.value = true },
+                        onRemoveUserData = { showRemoveDataConfirm.value = true },
+                        removeDataStatus = removeDataStatusState.value
                     )
                 }
                 else -> {
@@ -338,6 +342,40 @@ class MainActivity : ComponentActivity() {
                     },
                     dismissButton = {
                         Button(onClick = { showResetConfirm.value = false }) {
+                            Text(text = "Cancel")
+                        }
+                    }
+                )
+            }
+            if (showRemoveDataConfirm.value) {
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { showRemoveDataConfirm.value = false },
+                    title = { Text(text = "Remove all user data?") },
+                    text = {
+                        Text(
+                            text = "This will permanently delete ALL your chats, characters, " +
+                                "presets, worlds, settings, and any other data stored by the app. " +
+                                "This cannot be undone. Export a backup first if you want to keep anything."
+                        )
+                    },
+                    confirmButton = {
+                        Button(onClick = {
+                            showRemoveDataConfirm.value = false
+                            removeDataStatusState.value = "Removing data…"
+                            scope.launch {
+                                val paths = AppPaths(this@MainActivity)
+                                withContext(Dispatchers.IO) {
+                                    paths.configDir.deleteRecursively()
+                                    paths.dataDir.deleteRecursively()
+                                }
+                                removeDataStatusState.value = "User data removed."
+                            }
+                        }) {
+                            Text(text = "Remove")
+                        }
+                    },
+                    dismissButton = {
+                        Button(onClick = { showRemoveDataConfirm.value = false }) {
                             Text(text = "Cancel")
                         }
                     }

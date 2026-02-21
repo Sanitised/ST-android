@@ -1,5 +1,8 @@
 package io.github.sanitised.st
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,7 +15,12 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -37,7 +45,9 @@ fun AdvancedScreen(
     customStatus: String,
     serverRunning: Boolean,
     onLoadCustomZip: () -> Unit,
-    onResetToDefault: () -> Unit
+    onResetToDefault: () -> Unit,
+    onRemoveUserData: () -> Unit,
+    removeDataStatus: String
 ) {
     Surface(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -62,10 +72,13 @@ fun AdvancedScreen(
                 )
             }
             HorizontalDivider()
+            val scrollState = rememberScrollState()
+            val scrollbarColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+            Box(modifier = Modifier.fillMaxSize().verticalScrollbar(scrollState, scrollbarColor)) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(scrollState)
                     .padding(horizontal = 20.dp, vertical = 20.dp)
             ) {
                 Text(
@@ -171,10 +184,63 @@ fun AdvancedScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                Spacer(modifier = Modifier.height(24.dp))
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "User Data",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Permanently delete all chats, characters, presets, worlds, " +
+                            "settings, and other user data stored by the app.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = onRemoveUserData,
+                    enabled = buttonsEnabled,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(text = "Remove All User Data")
+                }
+                if (removeDataStatus.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = removeDataStatus,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
             }
         }
     }
 }
+
+private fun Modifier.verticalScrollbar(state: ScrollState, color: Color): Modifier =
+    drawWithContent {
+        drawContent()
+        if (state.maxValue > 0 && state.maxValue < Int.MAX_VALUE) {
+            val viewport = size.height
+            val content = viewport + state.maxValue
+            val thumbH = (viewport * viewport / content).coerceAtLeast(48f)
+            val thumbY = (state.value.toFloat() / state.maxValue) * (viewport - thumbH)
+            drawRoundRect(
+                color = color,
+                topLeft = Offset(size.width - 8f, thumbY + 2f),
+                size = Size(6f, thumbH - 4f),
+                cornerRadius = CornerRadius(3f)
+            )
+        }
+    }
 
 @Composable
 private fun WarningBullet(text: String, color: Color) {
@@ -216,6 +282,8 @@ private fun AdvancedScreenPreview() {
         customStatus = "Custom ST installed successfully.",
         serverRunning = false,
         onLoadCustomZip = {},
-        onResetToDefault = {}
+        onResetToDefault = {},
+        onRemoveUserData = {},
+        removeDataStatus = ""
     )
 }
