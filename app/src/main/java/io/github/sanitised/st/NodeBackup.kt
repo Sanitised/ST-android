@@ -12,6 +12,7 @@ import java.io.PushbackInputStream
 import java.nio.charset.StandardCharsets
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
+import java.util.zip.ZipInputStream
 
 object NodeBackup {
     private const val BACKUP_ROOT = "st_backup"
@@ -56,9 +57,28 @@ object NodeBackup {
             importDir.mkdirs()
 
             context.contentResolver.openInputStream(uri)?.use { raw ->
-                val stream = maybeGunzip(raw)
-                extractBackup(stream, importDir)
+                val pushback = PushbackInputStream(BufferedInputStream(raw), 2)
+                val sig = ByteArray(2)
+                val read = pushback.read(sig)
+                if (read > 0) pushback.unread(sig, 0, read)
+                when {
+                    read == 2 && sig[0] == 0x50.toByte() && sig[1] == 0x4B.toByte() ->
+                        extractBackupFromZip(pushback, importDir)
+                    read == 2 && sig[0] == 0x1F.toByte() && sig[1] == 0x8B.toByte() ->
+                        extractBackup(GZIPInputStream(pushback), importDir)
+                    else ->
+                        extractBackup(pushback, importDir)
+                }
             } ?: throw IllegalStateException("Unable to open archive")
+
+            val configSrc = File(importDir, "config/config.yaml")
+            val dataSrc = File(importDir, "data")
+            if (!configSrc.exists() && !dataSrc.exists()) {
+                throw IllegalStateException(
+                    "No recognizable data found in archive. " +
+                        "Make sure you selected a valid SillyTavern backup (.tar.gz or .zip)."
+                )
+            }
 
             val configDest = paths.configFile
             val dataDest = paths.dataDir
@@ -69,12 +89,10 @@ object NodeBackup {
                 dataDest.deleteRecursively()
             }
 
-            val configSrc = File(importDir, "config/config.yaml")
             if (configSrc.exists()) {
                 configDest.parentFile?.mkdirs()
                 configSrc.copyTo(configDest, overwrite = true)
             }
-            val dataSrc = File(importDir, "data")
             if (dataSrc.exists()) {
                 dataDest.parentFile?.mkdirs()
                 dataSrc.copyRecursively(dataDest, overwrite = true)
@@ -87,17 +105,28 @@ object NodeBackup {
         }
     }
 
-    private fun maybeGunzip(input: InputStream): InputStream {
-        val pushback = PushbackInputStream(BufferedInputStream(input), 2)
-        val signature = ByteArray(2)
-        val read = pushback.read(signature)
-        if (read > 0) {
-            pushback.unread(signature, 0, read)
-        }
-        return if (read == 2 && signature[0] == 0x1F.toByte() && signature[1] == 0x8B.toByte()) {
-            GZIPInputStream(pushback)
-        } else {
-            pushback
+    private fun extractBackupFromZip(input: InputStream, destDir: File) {
+        try {
+            ZipInputStream(input).use { zis ->
+                var entry = zis.nextEntry
+                while (entry != null) {
+                    if (entry.name.isNotEmpty()) {
+                        val target = mapBackupPath(destDir, entry.name)
+                        if (target != null) {
+                            if (entry.isDirectory) {
+                                target.mkdirs()
+                            } else {
+                                target.parentFile?.mkdirs()
+                                FileOutputStream(target).use { out -> zis.copyTo(out) }
+                            }
+                        }
+                    }
+                    zis.closeEntry()
+                    entry = zis.nextEntry
+                }
+            }
+        } catch (e: java.util.zip.ZipException) {
+            throw IllegalStateException("Not a valid ZIP archive: ${e.message}", e)
         }
     }
 

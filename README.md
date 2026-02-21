@@ -20,7 +20,9 @@ It is intended primarily for basic on-device chatting; advanced workflows (for e
 
 ## Importing data from SillyTavern on Termux/PC
 
-Pack your SillyTavern `data/` folder (and optionally `config.yaml`) into an `.tar.gz` archive with this structure:
+The app accepts `.tar.gz`, `.tar`, and `.zip` archives. The format is detected automatically.
+
+Pack your SillyTavern `data/` folder (and optionally `config.yaml`) into an archive with this structure:
 
 ```
 st_backup/
@@ -34,7 +36,7 @@ mkdir st_backup
 cp /path/to/sillytavern/config.yaml st_backup/
 cp -r /path/to/sillytavern/data st_backup/
 tar -czf st_backup.tar.gz st_backup/
-# Getting archive out of Termix
+# Getting archive out of Termux
 termux-setup-storage
 # Grant storage permission
 cp st_backup.tar.gz ~/storage/downloads/

@@ -177,7 +177,9 @@ class MainActivity : ComponentActivity() {
                     val result = withContext(Dispatchers.IO) {
                         NodeBackup.exportToUri(this@MainActivity, uri)
                     }
-                    backupStatusState.value = result.getOrElse { "Export failed: ${it.message ?: "unknown error"}" }
+                    val msg = result.getOrElse { "Export failed: ${it.message ?: "unknown error"}" }
+                    backupStatusState.value = msg
+                    appendServiceLog(msg)
                 }
             }
             val importLauncher = rememberLauncherForActivityResult(
@@ -204,10 +206,12 @@ class MainActivity : ComponentActivity() {
                     }
                     isCustomInstalledState.value = payload.isCustomInstalled()
                     isCustomInstallingState.value = false
-                    customStatusState.value = result.fold(
+                    val msg = result.fold(
                         onSuccess = { "Custom ST installed successfully." },
                         onFailure = { "Installation failed: ${it.message ?: "unknown error"}" }
                     )
+                    customStatusState.value = msg
+                    appendServiceLog(msg)
                 }
             }
 
@@ -289,6 +293,8 @@ class MainActivity : ComponentActivity() {
                         onImport = {
                             importLauncher.launch(
                                 arrayOf(
+                                    "application/zip",
+                                    "application/x-zip-compressed",
                                     "application/gzip",
                                     "application/x-gzip",
                                     "application/octet-stream",
@@ -331,10 +337,12 @@ class MainActivity : ComponentActivity() {
                                 }
                                 isCustomInstalledState.value = payload.isCustomInstalled()
                                 isCustomInstallingState.value = false
-                                customStatusState.value = result.fold(
+                                val msg = result.fold(
                                     onSuccess = { "Reset to default complete." },
                                     onFailure = { "Reset failed: ${it.message ?: "unknown error"}" }
                                 )
+                                customStatusState.value = msg
+                                appendServiceLog(msg)
                             }
                         }) {
                             Text(text = "Reset")
@@ -408,13 +416,15 @@ class MainActivity : ComponentActivity() {
                                 } else {
                                     Result.success(Unit)
                                 }
-                                backupStatusState.value = when {
+                                val msg = when {
                                     importResult.isFailure ->
                                         "Import failed: ${importResult.exceptionOrNull()?.message ?: "unknown error"}"
                                     postInstallResult.isFailure ->
                                         "Import complete, post-install failed: ${postInstallResult.exceptionOrNull()?.message ?: "unknown error"}"
                                     else -> "Import complete"
                                 }
+                                backupStatusState.value = msg
+                                appendServiceLog(msg)
                             }
                         }) {
                             Text(text = "Import")
@@ -430,6 +440,15 @@ class MainActivity : ComponentActivity() {
                     }
                 )
             }
+        }
+    }
+
+    private suspend fun appendServiceLog(message: String) {
+        withContext(Dispatchers.IO) {
+            val logsDir = AppPaths(this@MainActivity).logsDir
+            if (!logsDir.exists()) logsDir.mkdirs()
+            val logFile = File(logsDir, "service.log")
+            logFile.appendText("${System.currentTimeMillis()}: $message\n", Charsets.UTF_8)
         }
     }
 

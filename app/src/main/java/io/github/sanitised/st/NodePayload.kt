@@ -545,21 +545,25 @@ class NodePayload(private val context: Context) {
     }
 
     private fun extractZipToDir(input: InputStream, destDir: File) {
-        ZipInputStream(BufferedInputStream(input)).use { zis ->
-            var entry = zis.nextEntry
-            while (entry != null) {
-                if (entry.name.isNotEmpty()) {
-                    val target = TarUtils.safeResolve(destDir, entry.name)
-                    if (entry.isDirectory) {
-                        target.mkdirs()
-                    } else {
-                        target.parentFile?.mkdirs()
-                        FileOutputStream(target).use { out -> zis.copyTo(out) }
+        try {
+            ZipInputStream(BufferedInputStream(input)).use { zis ->
+                var entry = zis.nextEntry
+                while (entry != null) {
+                    if (entry.name.isNotEmpty()) {
+                        val target = TarUtils.safeResolve(destDir, entry.name)
+                        if (entry.isDirectory) {
+                            target.mkdirs()
+                        } else {
+                            target.parentFile?.mkdirs()
+                            FileOutputStream(target).use { out -> zis.copyTo(out) }
+                        }
                     }
+                    zis.closeEntry()
+                    entry = zis.nextEntry
                 }
-                zis.closeEntry()
-                entry = zis.nextEntry
             }
+        } catch (e: java.util.zip.ZipException) {
+            throw IllegalStateException("Not a valid ZIP file: ${e.message}", e)
         }
     }
 
