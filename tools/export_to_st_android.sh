@@ -131,18 +131,25 @@ step "[4/4] Making archive accessible"
 if is_termux; then
     DOWNLOADS_DIR="$HOME/storage/downloads"
 
-    if [ ! -d "$DOWNLOADS_DIR" ]; then
-        warn "Termux storage access is not set up yet."
+    # Check actual write access, not just directory existence —
+    # the symlink persists even after storage permission is revoked.
+    storage_writable() {
+        touch "$DOWNLOADS_DIR/.st_write_test" 2>/dev/null \
+            && rm -f "$DOWNLOADS_DIR/.st_write_test"
+    }
+
+    if ! storage_writable; then
+        warn "Termux storage access is not available (not set up, or permission was revoked)."
         echo ""
         echo "  About to run termux-setup-storage."
         echo "  → A system dialog will pop up — tap Allow."
         echo ""
         read -r -p "  Press Enter to continue…"
         termux-setup-storage
-        # Poll until ~/storage symlink appears (user tapped Allow) or 60 s timeout.
+        # Poll until the directory is actually writable or 60 s timeout.
         echo -n "  Waiting for permission"
         for _ in $(seq 1 60); do
-            if [ -d "$DOWNLOADS_DIR" ]; then break; fi
+            if storage_writable; then break; fi
             echo -n "."
             sleep 1
         done
