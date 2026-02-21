@@ -5,11 +5,11 @@ SillyTavern app for Android. Works on device with zero setup. Supports Android 8
 <img src="pics/ST-android-screenshot.png" alt="Screenshot" width="300">
 
 This is a personal project and is not affiliated with or endorsed by SillyTavern.
-It is intended primarily for basic on-device chatting; advanced workflows (for example, some extensions) may not work.
+It is intended primarily for basic on-device chatting; advanced workflows (for example, extensions) may not work.
 
 ## Privacy
 
-- The app makes no network requests beyond what SillyTavern itself does.
+- The app makes no network requests beyond what SillyTavern itself does. Exception: loading a custom SillyTavern ZIP runs `npm install` to fetch its dependencies.
 - No telemetry of any kind.
 - Unlike Termux, app works in Private Space/Secure Folder/Secondary profiles.
 - All chats, characters, settings stay local unless you decide to export them manually and share with others.
