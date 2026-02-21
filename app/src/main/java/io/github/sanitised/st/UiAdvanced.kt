@@ -2,6 +2,7 @@ package io.github.sanitised.st
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -33,7 +34,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 
@@ -173,7 +179,7 @@ fun AdvancedScreen(
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(modifier = Modifier.height(10.dp))
-                InstructionStep("1", "Go to github.com/SillyTavern/SillyTavern")
+                InstructionStep("1", "Go to github.com/SillyTavern/SillyTavern", url = "https://github.com/SillyTavern/SillyTavern")
                 InstructionStep("2", "Select the commit or release tag you want to install")
                 InstructionStep("3", "Click Code → Download ZIP")
                 InstructionStep("4", "Come back here and tap Load ZIP")
@@ -254,21 +260,39 @@ private fun WarningBullet(text: String, color: Color) {
 }
 
 @Composable
-private fun InstructionStep(number: String, text: String) {
+private fun InstructionStep(number: String, text: String, url: String? = null) {
+    val uriHandler = LocalUriHandler.current
+    val linkColor = MaterialTheme.colorScheme.primary
+    val bodyStyle = MaterialTheme.typography.bodyMedium
     Row(
         modifier = Modifier.padding(vertical = 3.dp),
         verticalAlignment = Alignment.Top
     ) {
         Text(
             text = "$number.  ",
-            style = MaterialTheme.typography.bodyMedium,
+            style = bodyStyle,
             fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.primary
+            color = linkColor
         )
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium
-        )
+        if (url != null) {
+            val annotated = buildAnnotatedString {
+                pushStringAnnotation(tag = "URL", annotation = url)
+                withStyle(SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)) {
+                    append(text)
+                }
+                pop()
+            }
+            ClickableText(
+                text = annotated,
+                style = bodyStyle,
+                onClick = { offset ->
+                    annotated.getStringAnnotations("URL", offset, offset)
+                        .firstOrNull()?.let { uriHandler.openUri(it.item) }
+                }
+            )
+        } else {
+            Text(text = text, style = bodyStyle)
+        }
     }
 }
 
