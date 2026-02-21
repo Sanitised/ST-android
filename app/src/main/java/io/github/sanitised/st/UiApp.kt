@@ -46,6 +46,7 @@ import java.net.Socket
 @Composable
 fun STAndroidApp(
     status: NodeStatus,
+    busyMessage: String,
     onStart: () -> Unit,
     onStop: () -> Unit,
     onOpen: () -> Unit,
@@ -64,6 +65,7 @@ fun STAndroidApp(
     onShowAdvanced: () -> Unit
 ) {
     MaterialTheme {
+        val isBusy = busyMessage.isNotBlank()
         val readyState = remember { mutableStateOf(false) }
         val view = LocalView.current
         val darkTheme = isSystemInDarkTheme()
@@ -176,7 +178,7 @@ fun STAndroidApp(
                         Spacer(modifier = Modifier.width(12.dp))
                         OutlinedButton(
                             onClick = onEditConfig,
-                            enabled = status.state == NodeState.STOPPED || status.state == NodeState.ERROR,
+                            enabled = !isBusy && (status.state == NodeState.STOPPED || status.state == NodeState.ERROR),
                             modifier = Modifier.weight(1f)
                         ) {
                             Text(text = "Edit Config")
@@ -186,7 +188,7 @@ fun STAndroidApp(
                     Row(modifier = Modifier.fillMaxWidth()) {
                         OutlinedButton(
                             onClick = onExport,
-                            enabled = status.state == NodeState.STOPPED || status.state == NodeState.ERROR,
+                            enabled = !isBusy && (status.state == NodeState.STOPPED || status.state == NodeState.ERROR),
                             modifier = Modifier.weight(1f)
                         ) {
                             Text(text = "Export Data")
@@ -194,7 +196,7 @@ fun STAndroidApp(
                         Spacer(modifier = Modifier.width(12.dp))
                         OutlinedButton(
                             onClick = onImport,
-                            enabled = status.state == NodeState.STOPPED || status.state == NodeState.ERROR,
+                            enabled = !isBusy && (status.state == NodeState.STOPPED || status.state == NodeState.ERROR),
                             modifier = Modifier.weight(1f)
                         ) {
                             Text(text = "Import Data")
@@ -244,7 +246,7 @@ fun STAndroidApp(
                 HorizontalDivider()
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = status.message,
+                    text = busyMessage.ifBlank { status.message },
                     modifier = Modifier.fillMaxWidth(),
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center
@@ -253,7 +255,7 @@ fun STAndroidApp(
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Button(
                         onClick = onStart,
-                        enabled = status.state == NodeState.STOPPED || status.state == NodeState.ERROR,
+                        enabled = !isBusy && (status.state == NodeState.STOPPED || status.state == NodeState.ERROR),
                         modifier = Modifier.weight(1f)
                     ) {
                         Text(text = "Start")
@@ -304,6 +306,7 @@ private fun probeServer(port: Int): Boolean {
 private fun STAndroidAppPreview() {
     STAndroidApp(
         status = NodeStatus(NodeState.STOPPED, "Idle"),
+        busyMessage = "",
         onStart = {},
         onStop = {},
         onOpen = {},

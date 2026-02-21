@@ -35,6 +35,8 @@ import java.nio.file.Files
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
+private enum class BusyOperation { EXPORTING, IMPORTING, INSTALLING, RESETTING, REMOVING_DATA }
+
 class MainActivity : ComponentActivity() {
     private val nodeServiceState = mutableStateOf<NodeService?>(null)
 
@@ -92,7 +94,7 @@ class MainActivity : ComponentActivity() {
             val pendingImportUri = remember { mutableStateOf<Uri?>(null) }
             val showImportConfirm = remember { mutableStateOf(false) }
             val isCustomInstalledState = remember { mutableStateOf(NodePayload(this@MainActivity).isCustomInstalled()) }
-            val isCustomInstallingState = remember { mutableStateOf(false) }
+            val busyOperationState = remember { mutableStateOf<BusyOperation?>(null) }
             val customStatusState = remember { mutableStateOf("") }
             val showResetConfirm = remember { mutableStateOf(false) }
             val showRemoveDataConfirm = remember { mutableStateOf(false) }
@@ -100,6 +102,14 @@ class MainActivity : ComponentActivity() {
             val notificationGrantedState = remember { mutableStateOf(isNotificationPermissionGranted()) }
             val lifecycleOwner = LocalLifecycleOwner.current
             val scope = rememberCoroutineScope()
+            val busyMessage = when (busyOperationState.value) {
+                BusyOperation.EXPORTING -> "Exporting data…"
+                BusyOperation.IMPORTING -> "Importing data…"
+                BusyOperation.INSTALLING -> "Installing custom ST…"
+                BusyOperation.RESETTING -> "Resetting to default…"
+                BusyOperation.REMOVING_DATA -> "Removing user data…"
+                null -> ""
+            }
             val listener = remember {
                 object : NodeStatusListener {
                     override fun onStatus(status: NodeStatus) {
@@ -173,12 +183,14 @@ class MainActivity : ComponentActivity() {
             ) { uri ->
                 if (uri == null) return@rememberLauncherForActivityResult
                 backupStatusState.value = "Exporting..."
+                busyOperationState.value = BusyOperation.EXPORTING
                 scope.launch {
                     val result = withContext(Dispatchers.IO) {
                         NodeBackup.exportToUri(this@MainActivity, uri)
                     }
                     val msg = result.getOrElse { "Export failed: ${it.message ?: "unknown error"}" }
                     backupStatusState.value = msg
+                    busyOperationState.value = null
                     appendServiceLog(msg)
                 }
             }
@@ -193,7 +205,7 @@ class MainActivity : ComponentActivity() {
                 ActivityResultContracts.OpenDocument()
             ) { uri ->
                 if (uri == null) return@rememberLauncherForActivityResult
-                isCustomInstallingState.value = true
+                busyOperationState.value = BusyOperation.INSTALLING
                 customStatusState.value = "Starting…"
                 scope.launch {
                     val payload = NodePayload(this@MainActivity)
@@ -205,7 +217,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     isCustomInstalledState.value = payload.isCustomInstalled()
-                    isCustomInstallingState.value = false
+                    busyOperationState.value = null
                     val msg = result.fold(
                         onSuccess = { "Custom ST installed successfully." },
                         onFailure = { "Installation failed: ${it.message ?: "unknown error"}" }
@@ -257,10 +269,10 @@ class MainActivity : ComponentActivity() {
                     AdvancedScreen(
                         onBack = { showAdvancedState.value = false },
                         isCustomInstalled = isCustomInstalledState.value,
-                        isCustomInstalling = isCustomInstallingState.value,
                         customStatus = customStatusState.value,
                         serverRunning = statusState.value.state == NodeState.RUNNING ||
                             statusState.value.state == NodeState.STARTING,
+                        busyMessage = busyMessage,
                         onLoadCustomZip = {
                             customZipLauncher.launch(
                                 arrayOf(
@@ -278,6 +290,7 @@ class MainActivity : ComponentActivity() {
                 else -> {
                     STAndroidApp(
                         status = statusState.value,
+                        busyMessage = busyMessage,
                         onStart = { startNode() },
                         onStop = { stopNode() },
                         onOpen = { openNodeUi(statusState.value.port) },
@@ -328,7 +341,7 @@ class MainActivity : ComponentActivity() {
                     confirmButton = {
                         Button(onClick = {
                             showResetConfirm.value = false
-                            isCustomInstallingState.value = true
+                            busyOperationState.value = BusyOperation.RESETTING
                             customStatusState.value = "Resetting…"
                             scope.launch {
                                 val payload = NodePayload(this@MainActivity)
@@ -336,7 +349,7 @@ class MainActivity : ComponentActivity() {
                                     payload.resetToDefault()
                                 }
                                 isCustomInstalledState.value = payload.isCustomInstalled()
-                                isCustomInstallingState.value = false
+                                busyOperationState.value = null
                                 val msg = result.fold(
                                     onSuccess = { "Reset to default complete." },
                                     onFailure = { "Reset failed: ${it.message ?: "unknown error"}" }
@@ -370,13 +383,17 @@ class MainActivity : ComponentActivity() {
                         Button(onClick = {
                             showRemoveDataConfirm.value = false
                             removeDataStatusState.value = "Removing data…"
+                            busyOperationState.value = BusyOperation.REMOVING_DATA
                             scope.launch {
                                 val paths = AppPaths(this@MainActivity)
                                 withContext(Dispatchers.IO) {
                                     paths.configDir.deleteRecursively()
                                     paths.dataDir.deleteRecursively()
                                 }
-                                removeDataStatusState.value = "User data removed."
+                                val msg = "User data removed."
+                                removeDataStatusState.value = msg
+                                busyOperationState.value = null
+                                appendServiceLog(msg)
                             }
                         }) {
                             Text(text = "Remove")
@@ -406,6 +423,7 @@ class MainActivity : ComponentActivity() {
                             pendingImportUri.value = null
                             if (uri == null) return@Button
                             backupStatusState.value = "Importing..."
+                            busyOperationState.value = BusyOperation.IMPORTING
                             scope.launch {
                                 val importResult = withContext(Dispatchers.IO) {
                                     NodeBackup.importFromUri(this@MainActivity, uri)
@@ -424,6 +442,7 @@ class MainActivity : ComponentActivity() {
                                     else -> "Import complete"
                                 }
                                 backupStatusState.value = msg
+                                busyOperationState.value = null
                                 appendServiceLog(msg)
                             }
                         }) {

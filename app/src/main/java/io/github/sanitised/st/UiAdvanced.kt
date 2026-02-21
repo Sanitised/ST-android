@@ -47,9 +47,9 @@ import androidx.compose.ui.unit.dp
 fun AdvancedScreen(
     onBack: () -> Unit,
     isCustomInstalled: Boolean,
-    isCustomInstalling: Boolean,
     customStatus: String,
     serverRunning: Boolean,
+    busyMessage: String,
     onLoadCustomZip: () -> Unit,
     onResetToDefault: () -> Unit,
     onRemoveUserData: () -> Unit,
@@ -87,7 +87,7 @@ fun AdvancedScreen(
                     .verticalScroll(scrollState)
                     .padding(horizontal = 20.dp, vertical = 20.dp)
             ) {
-                val buttonsEnabled = !serverRunning && !isCustomInstalling
+                val buttonsEnabled = !serverRunning && busyMessage.isBlank()
                 Text(
                     text = "User Data",
                     style = MaterialTheme.typography.titleSmall,
@@ -198,6 +198,13 @@ fun AdvancedScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
+                } else if (busyMessage.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "$busyMessage — please wait.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 Button(
@@ -302,9 +309,9 @@ private fun AdvancedScreenPreview() {
     AdvancedScreen(
         onBack = {},
         isCustomInstalled = true,
-        isCustomInstalling = false,
         customStatus = "Custom ST installed successfully.",
         serverRunning = false,
+        busyMessage = "",
         onLoadCustomZip = {},
         onResetToDefault = {},
         onRemoveUserData = {},
