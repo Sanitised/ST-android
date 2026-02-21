@@ -55,7 +55,12 @@ fun STAndroidApp(
     stLabel: String,
     nodeLabel: String,
     symlinkSupported: Boolean,
-    onShowLegal: () -> Unit
+    onShowLegal: () -> Unit,
+    isCustomInstalled: Boolean,
+    isCustomInstalling: Boolean,
+    customStatus: String,
+    onLoadCustomZip: () -> Unit,
+    onResetToDefault: () -> Unit
 ) {
     MaterialTheme {
         val readyState = remember { mutableStateOf(false) }
@@ -157,6 +162,43 @@ fun STAndroidApp(
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(text = backupStatus, style = MaterialTheme.typography.bodySmall)
                         }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "Custom SillyTavern Version",
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Power-user feature. Load a SillyTavern source ZIP " +
+                                "(e.g. from GitHub). Back up your data first. " +
+                                "You are responsible for the archive you load.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        val customButtonsEnabled =
+                            (status.state == NodeState.STOPPED || status.state == NodeState.ERROR) &&
+                                !isCustomInstalling
+                        Row {
+                            Button(
+                                onClick = onLoadCustomZip,
+                                enabled = customButtonsEnabled
+                            ) {
+                                Text(text = if (isCustomInstalled) "Load New ZIP" else "Load Custom ST (ZIP)")
+                            }
+                            if (isCustomInstalled) {
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Button(
+                                    onClick = onResetToDefault,
+                                    enabled = customButtonsEnabled
+                                ) {
+                                    Text(text = "Reset to Default")
+                                }
+                            }
+                        }
+                        if (customStatus.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(text = customStatus, style = MaterialTheme.typography.bodySmall)
+                        }
                         if (showNotificationPrompt) {
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
@@ -244,6 +286,11 @@ private fun STAndroidAppPreview() {
         stLabel = "SillyTavern 1.0.0",
         nodeLabel = "Node v24.13.0",
         symlinkSupported = true,
-        onShowLegal = {}
+        onShowLegal = {},
+        isCustomInstalled = false,
+        isCustomInstalling = false,
+        customStatus = "",
+        onLoadCustomZip = {},
+        onResetToDefault = {}
     )
 }

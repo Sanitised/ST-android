@@ -15,6 +15,8 @@ class AppPaths(private val context: Context) {
     val tmpDir: File get() = File(filesDir, "tmp")
     val nodeTmpDir: File get() = File(cacheDir, "node_tmp")
 
+    val npmDir: File get() = File(filesDir, "npm")
+
     val legacyAppDir: File get() = File(filesDir, "node/app")
 
     fun nodeBin(abi: String): File = File(filesDir, "node/bin/$abi/node")

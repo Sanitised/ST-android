@@ -90,6 +90,11 @@ class MainActivity : ComponentActivity() {
             val backupStatusState = remember { mutableStateOf("") }
             val pendingImportUri = remember { mutableStateOf<Uri?>(null) }
             val showImportConfirm = remember { mutableStateOf(false) }
+            val isCustomInstalledState = remember { mutableStateOf(NodePayload(this@MainActivity).isCustomInstalled()) }
+            val isCustomInstallingState = remember { mutableStateOf(false) }
+            val customStatusState = remember { mutableStateOf("") }
+            val showCustomWarning = remember { mutableStateOf(false) }
+            val showResetConfirm = remember { mutableStateOf(false) }
             val notificationGrantedState = remember { mutableStateOf(isNotificationPermissionGranted()) }
             val lifecycleOwner = LocalLifecycleOwner.current
             val scope = rememberCoroutineScope()
@@ -213,6 +218,29 @@ class MainActivity : ComponentActivity() {
                     pendingImportUri.value = uri
                     showImportConfirm.value = true
                 }
+                val customZipLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.OpenDocument()
+                ) { uri ->
+                    if (uri == null) return@rememberLauncherForActivityResult
+                    isCustomInstallingState.value = true
+                    customStatusState.value = "Starting…"
+                    scope.launch {
+                        val payload = NodePayload(this@MainActivity)
+                        val result = withContext(Dispatchers.IO) {
+                            payload.installCustomFromZip(uri) { msg ->
+                                scope.launch(Dispatchers.Main) {
+                                    customStatusState.value = msg
+                                }
+                            }
+                        }
+                        isCustomInstalledState.value = payload.isCustomInstalled()
+                        isCustomInstallingState.value = false
+                        customStatusState.value = result.fold(
+                            onSuccess = { "Custom ST installed successfully." },
+                            onFailure = { "Installation failed: ${it.message ?: "unknown error"}" }
+                        )
+                    }
+                }
                 STAndroidApp(
                     status = statusState.value,
                     onStart = { startNode() },
@@ -239,11 +267,93 @@ class MainActivity : ComponentActivity() {
                     },
                     backupStatus = backupStatusState.value,
                     versionLabel = versionLabel,
-                    stLabel = stLabel,
+                    stLabel = if (isCustomInstalledState.value) "SillyTavern (custom)" else stLabel,
                     nodeLabel = nodeLabel,
                     symlinkSupported = symlinkSupported,
-                    onShowLegal = { showLegalState.value = true }
+                    onShowLegal = { showLegalState.value = true },
+                    isCustomInstalled = isCustomInstalledState.value,
+                    isCustomInstalling = isCustomInstallingState.value,
+                    customStatus = customStatusState.value,
+                    onLoadCustomZip = { showCustomWarning.value = true },
+                    onResetToDefault = { showResetConfirm.value = true }
                 )
+                if (showCustomWarning.value) {
+                    androidx.compose.material3.AlertDialog(
+                        onDismissRequest = { showCustomWarning.value = false },
+                        title = { Text(text = "Load custom SillyTavern?") },
+                        text = {
+                            Text(
+                                text = "You are about to replace the bundled SillyTavern with " +
+                                    "a version you provide.\n\n" +
+                                    "BACK UP YOUR DATA FIRST (use Export Data).\n\n" +
+                                    "Only load archives from sources you trust. Lifecycle " +
+                                    "scripts are blocked during install (--ignore-scripts), " +
+                                    "but you are responsible for the code you run.\n\n" +
+                                    "The server must be stopped before continuing.\n\n" +
+                                    "Select a SillyTavern source ZIP (e.g. the \"Source code\" " +
+                                    "zip from a GitHub release)."
+                            )
+                        },
+                        confirmButton = {
+                            Button(onClick = {
+                                showCustomWarning.value = false
+                                customZipLauncher.launch(
+                                    arrayOf(
+                                        "application/zip",
+                                        "application/x-zip-compressed",
+                                        "application/octet-stream"
+                                    )
+                                )
+                            }) {
+                                Text(text = "I understand, pick ZIP")
+                            }
+                        },
+                        dismissButton = {
+                            Button(onClick = { showCustomWarning.value = false }) {
+                                Text(text = "Cancel")
+                            }
+                        }
+                    )
+                }
+                if (showResetConfirm.value) {
+                    androidx.compose.material3.AlertDialog(
+                        onDismissRequest = { showResetConfirm.value = false },
+                        title = { Text(text = "Reset to default?") },
+                        text = {
+                            Text(
+                                text = "This will reinstall the SillyTavern version bundled " +
+                                    "with the app. Your data (chats, characters, settings) " +
+                                    "will not be affected."
+                            )
+                        },
+                        confirmButton = {
+                            Button(onClick = {
+                                showResetConfirm.value = false
+                                isCustomInstallingState.value = true
+                                customStatusState.value = "Resetting…"
+                                scope.launch {
+                                    val payload = NodePayload(this@MainActivity)
+                                    val result = withContext(Dispatchers.IO) {
+                                        payload.resetToDefault()
+                                    }
+                                    isCustomInstalledState.value = payload.isCustomInstalled()
+                                    isCustomInstallingState.value = false
+                                    customStatusState.value = result.fold(
+                                        onSuccess = { "Reset to default complete." },
+                                        onFailure = { "Reset failed: ${it.message ?: "unknown error"}" }
+                                    )
+                                }
+                            }) {
+                                Text(text = "Reset")
+                            }
+                        },
+                        dismissButton = {
+                            Button(onClick = { showResetConfirm.value = false }) {
+                                Text(text = "Cancel")
+                            }
+                        }
+                    )
+                }
                 if (showImportConfirm.value) {
                     androidx.compose.material3.AlertDialog(
                         onDismissRequest = { showImportConfirm.value = false },

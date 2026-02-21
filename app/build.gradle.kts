@@ -3,7 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-val fallbackVersionName = "0.2.0"
+val fallbackVersionName = "0.3.0"
 
 android {
     namespace = "io.github.sanitised.st"
@@ -71,6 +71,8 @@ android {
     buildTypes {
         debug {
             versionNameSuffix = "-dev"
+            applicationIdSuffix = ".dev"
+            resValue("string", "app_name", "ST dev")
         }
         release {
             isMinifyEnabled = false

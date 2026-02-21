@@ -1,6 +1,7 @@
 package io.github.sanitised.st
 
 import android.content.Context
+import android.net.Uri
 import android.os.Build
 import android.system.Os
 import java.io.BufferedInputStream
@@ -8,7 +9,9 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
 import java.nio.file.Files
+import java.util.concurrent.TimeUnit
 import java.util.zip.GZIPInputStream
+import java.util.zip.ZipInputStream
 import org.json.JSONObject
 
 class NodePayload(private val context: Context) {
@@ -53,6 +56,25 @@ class NodePayload(private val context: Context) {
             val dataDir = paths.dataDir
             val payloadVersion = readPayloadVersion()
             var payloadUpdated = false
+
+            // If user has a custom version installed, skip bundle extraction entirely.
+            if (isCustomInstalled() && appEntry.exists()) {
+                if (!logsDir.exists()) logsDir.mkdirs()
+                if (!configDir.exists()) configDir.mkdirs()
+                if (!dataDir.exists()) dataDir.mkdirs()
+                val configPath = ensureSymlink(link = File(appDir, "config.yaml"), target = configFile)
+                val dataPath = ensureSymlink(link = File(appDir, "data"), target = dataDir)
+                return@runCatching Layout(
+                    nodeBin = nodeBin,
+                    appDir = appDir,
+                    appEntry = appEntry,
+                    logsDir = logsDir,
+                    configFile = configPath,
+                    dataDir = dataPath,
+                    payloadUpdated = false,
+                    payloadVersion = null
+                )
+            }
 
             if (!nodeBin.exists()) {
                 val abi = selectAbi() ?: throw IllegalStateException(
@@ -340,5 +362,213 @@ class NodePayload(private val context: Context) {
         val size = TarUtils.parseTarNumeric(header, 124, 12)
         val padding = (512 - (size % 512)) % 512
         TarUtils.skipFully(input, size + padding)
+    }
+
+    // -------------------------------------------------------------------------
+    // Custom ST version management
+    // -------------------------------------------------------------------------
+
+    fun isCustomInstalled(): Boolean {
+        return context.getSharedPreferences("payload", Context.MODE_PRIVATE)
+            .getBoolean("custom_installed", false)
+    }
+
+    /**
+     * Install a user-provided SillyTavern source ZIP.
+     * The ZIP may have a single top-level directory (GitHub archive format) or
+     * place files at the root.  server.js must be present.
+     *
+     * User data (data/ and config.yaml) is never touched.
+     * [onProgress] is called from the worker thread; callers must marshal to
+     * the main thread themselves if needed.
+     */
+    fun installCustomFromZip(uri: Uri, onProgress: (String) -> Unit): Result<Unit> {
+        return runCatching {
+            val paths = AppPaths(context)
+            val tmpRoot = paths.tmpDir
+            tmpRoot.mkdirs()
+
+            val extractDir = File(tmpRoot, "custom_extract")
+            try {
+                // 1. Extract ZIP
+                onProgress("Extracting archive…")
+                if (extractDir.exists()) extractDir.deleteRecursively()
+                extractDir.mkdirs()
+                context.contentResolver.openInputStream(uri)
+                    ?.use { input -> extractZipToDir(input, extractDir) }
+                    ?: throw IllegalStateException("Cannot open the selected file.")
+
+                // 2. Locate server.js (handle GitHub's top-level directory wrapper)
+                val stRoot = findStRoot(extractDir)
+                    ?: throw IllegalStateException(
+                        "server.js not found in archive. " +
+                            "Make sure you selected a SillyTavern source ZIP."
+                    )
+
+                if (!File(stRoot, "package.json").exists()) {
+                    throw IllegalStateException(
+                        "package.json not found. This does not look like a valid SillyTavern archive."
+                    )
+                }
+
+                // 3. Ensure npm is available
+                onProgress("Preparing npm…")
+                val npmCli = ensureNpmExtracted()
+                val nodeBin = findNodeBin()
+
+                // 4. npm install
+                onProgress("Installing dependencies (npm install)…")
+                val npmLog = File(paths.logsDir.also { it.mkdirs() }, "npm_install.log")
+                runNpmInstall(stRoot, nodeBin, npmCli, npmLog)
+
+                // 5. Atomic swap: move new tree into place
+                onProgress("Installing…")
+                val stDir = paths.stDir
+                val oldDir = File(tmpRoot, "custom_old")
+                if (oldDir.exists()) oldDir.deleteRecursively()
+                if (stDir.exists()) {
+                    if (!stDir.renameTo(oldDir)) stDir.deleteRecursively()
+                }
+                if (!stRoot.renameTo(stDir)) {
+                    stRoot.copyRecursively(stDir, overwrite = true)
+                    stRoot.deleteRecursively()
+                }
+                if (oldDir.exists()) oldDir.deleteRecursively()
+
+                // 6. Re-create symlinks so user data paths stay correct
+                val configDir = paths.configDir
+                val dataDir = paths.dataDir
+                if (!configDir.exists()) configDir.mkdirs()
+                if (!dataDir.exists()) dataDir.mkdirs()
+                ensureSymlink(link = File(stDir, "config.yaml"), target = paths.configFile)
+                ensureSymlink(link = File(stDir, "data"), target = dataDir)
+
+                // 7. Persist custom flag; clear bundled-version stamp so a
+                //    future reset will force re-extraction of the bundled tar.
+                context.getSharedPreferences("payload", Context.MODE_PRIVATE).edit()
+                    .putBoolean("custom_installed", true)
+                    .remove("st_payload_version")
+                    .apply()
+
+                onProgress("Done!")
+            } finally {
+                // Best-effort cleanup of the temp extraction directory.
+                if (extractDir.exists()) extractDir.deleteRecursively()
+            }
+        }
+    }
+
+    /**
+     * Delete the custom ST installation and restore the bundled version.
+     * User data is not affected.
+     */
+    fun resetToDefault(): Result<Unit> {
+        return runCatching {
+            val paths = AppPaths(context)
+            context.getSharedPreferences("payload", Context.MODE_PRIVATE).edit()
+                .remove("custom_installed")
+                .remove("st_payload_version")
+                .apply()
+            paths.stDir.deleteRecursively()
+            ensureExtracted().getOrThrow()
+        }
+    }
+
+    private fun findNodeBin(): File {
+        val nativeNode = File(context.applicationInfo.nativeLibraryDir, "libnode.so")
+        if (nativeNode.exists()) return nativeNode
+        val abi = selectAbi()
+            ?: throw IllegalStateException("No matching Node.js binary found for this device ABI.")
+        return AppPaths(context).nodeBin(abi)
+    }
+
+    private fun ensureNpmExtracted(): File {
+        val paths = AppPaths(context)
+        val npmCli = File(paths.npmDir, "bin/npm-cli.js")
+        if (npmCli.exists()) return npmCli
+
+        val assetPath = "node_payload/npm.tar"
+        if (!assetExists(assetPath)) {
+            throw IllegalStateException(
+                "npm is not bundled in this build. Rebuild the app to enable custom ST installation."
+            )
+        }
+        if (paths.npmDir.exists()) paths.npmDir.deleteRecursively()
+        // The tar contains an "npm/" directory; extract into filesDir so the
+        // result lands at filesDir/npm/.
+        extractTarFromAssets(assetPath, paths.filesDir)
+        if (!npmCli.exists()) {
+            throw IllegalStateException("npm extraction failed: bin/npm-cli.js not found.")
+        }
+        return npmCli
+    }
+
+    private fun runNpmInstall(stRoot: File, nodeBin: File, npmCli: File, logFile: File) {
+        val npmCache = File(context.cacheDir, "npm_cache").also { it.mkdirs() }
+        val tmpDir = AppPaths(context).nodeTmpDir.also { it.mkdirs() }
+
+        val builder = ProcessBuilder(
+            nodeBin.absolutePath,
+            npmCli.absolutePath,
+            "install",
+            "--omit=dev",
+            "--ignore-scripts"
+        )
+        builder.directory(stRoot)
+        builder.environment()["HOME"] = context.filesDir.absolutePath
+        builder.environment()["NPM_CONFIG_CACHE"] = npmCache.absolutePath
+        builder.environment()["TMPDIR"] = tmpDir.absolutePath
+        builder.environment()["TMP"] = tmpDir.absolutePath
+        builder.environment()["TEMP"] = tmpDir.absolutePath
+        builder.environment()["LD_LIBRARY_PATH"] = context.applicationInfo.nativeLibraryDir
+        builder.environment()["NODE_ENV"] = "production"
+        builder.redirectOutput(logFile)
+        builder.redirectErrorStream(true)
+
+        val proc = builder.start()
+        val finished = proc.waitFor(10, TimeUnit.MINUTES)
+        if (!finished) {
+            proc.destroyForcibly()
+            throw IllegalStateException("npm install timed out after 10 minutes.")
+        }
+        val exitCode = proc.exitValue()
+        if (exitCode != 0) {
+            val tail = try {
+                logFile.readLines().takeLast(20).joinToString("\n")
+            } catch (_: Exception) {
+                "(no log output)"
+            }
+            throw IllegalStateException(
+                "npm install failed (exit code $exitCode). Last output:\n$tail"
+            )
+        }
+    }
+
+    private fun extractZipToDir(input: InputStream, destDir: File) {
+        ZipInputStream(BufferedInputStream(input)).use { zis ->
+            var entry = zis.nextEntry
+            while (entry != null) {
+                if (entry.name.isNotEmpty()) {
+                    val target = TarUtils.safeResolve(destDir, entry.name)
+                    if (entry.isDirectory) {
+                        target.mkdirs()
+                    } else {
+                        target.parentFile?.mkdirs()
+                        FileOutputStream(target).use { out -> zis.copyTo(out) }
+                    }
+                }
+                zis.closeEntry()
+                entry = zis.nextEntry
+            }
+        }
+    }
+
+    private fun findStRoot(dir: File): File? {
+        if (File(dir, "server.js").exists()) return dir
+        val children = dir.listFiles() ?: return null
+        for (child in children) {
+            if (child.isDirectory && File(child, "server.js").exists()) return child
+        }
+        return null
     }
 }
