@@ -42,7 +42,7 @@ object NodeBackup {
                     }
                 }
             } ?: throw IllegalStateException("Unable to open destination")
-            "Export complete"
+            "Export completed"
         }
     }
 
@@ -64,8 +64,10 @@ object NodeBackup {
                 when {
                     read == 2 && sig[0] == 0x50.toByte() && sig[1] == 0x4B.toByte() ->
                         extractBackupFromZip(pushback, importDir)
+
                     read == 2 && sig[0] == 0x1F.toByte() && sig[1] == 0x8B.toByte() ->
                         extractBackup(GZIPInputStream(pushback), importDir)
+
                     else ->
                         extractBackup(pushback, importDir)
                 }
@@ -76,7 +78,7 @@ object NodeBackup {
             if (!configSrc.exists() && !dataSrc.exists()) {
                 throw IllegalStateException(
                     "No recognizable data found in archive. " +
-                        "Make sure you selected a valid SillyTavern backup (.tar.gz or .zip)."
+                            "Make sure you selected a valid SillyTavern backup (.tar.gz or .zip)."
                 )
             }
 
