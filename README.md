@@ -22,7 +22,18 @@ It is intended primarily for basic on-device chatting; advanced workflows (for e
 
 The app accepts `.tar.gz`, `.tar`, and `.zip` archives. The format is detected automatically.
 
-Pack your SillyTavern `data/` folder (and optionally `config.yaml`) into an archive with this structure:
+### Quick export (Termux or Linux)
+
+Run this one-liner:
+
+```bash
+bash <(curl -sSf https://raw.githubusercontent.com/Sanitised/ST-android/master/tools/export_to_st_android.sh)
+```
+If your SillyTavern folder is not in a standard location, first do `cd ./my-sillytavern`.
+
+### Manual export
+
+The archive must have this structure:
 
 ```
 st_backup/
@@ -30,15 +41,17 @@ st_backup/
 └── data/
 ```
 
-Termux commands:
 ```bash
 mkdir st_backup
 cp /path/to/sillytavern/config.yaml st_backup/
 cp -r /path/to/sillytavern/data st_backup/
 tar -czf st_backup.tar.gz st_backup/
-# Getting archive out of Termux
-termux-setup-storage
-# Grant storage permission
+```
+
+On Termux, copy the archive to Downloads so the app can reach it:
+
+```bash
+termux-setup-storage   # one-time permission grant
 cp st_backup.tar.gz ~/storage/downloads/
 ```
 
