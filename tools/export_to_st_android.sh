@@ -134,8 +134,8 @@ if is_termux; then
     # Check actual write access, not just directory existence —
     # the symlink persists even after storage permission is revoked.
     storage_writable() {
-        touch "$DOWNLOADS_DIR/.st_write_test" 2>/dev/null \
-            && rm -f "$DOWNLOADS_DIR/.st_write_test"
+        touch "$DOWNLOADS_DIR/.sanitised_st_write_test" 2>/dev/null \
+            && rm -f "$DOWNLOADS_DIR/.sanitised_st_write_test"
     }
 
     if ! storage_writable; then
