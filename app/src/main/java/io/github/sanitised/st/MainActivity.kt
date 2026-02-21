@@ -26,16 +26,14 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.io.File
 import java.nio.file.Files
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-
-private enum class BusyOperation { EXPORTING, IMPORTING, INSTALLING, RESETTING, REMOVING_DATA }
 
 class MainActivity : ComponentActivity() {
     private val nodeServiceState = mutableStateOf<NodeService?>(null)
@@ -81,6 +79,7 @@ class MainActivity : ComponentActivity() {
         } ?: "Node unknown"
         val symlinkSupported = isSymlinkSupported()
         setContent {
+            val viewModel: MainViewModel = viewModel()
             val statusState = remember { mutableStateOf(NodeStatus(NodeState.STOPPED, "Idle")) }
             val showLogsState = remember { mutableStateOf(false) }
             val showConfigState = remember { mutableStateOf(false) }
@@ -90,26 +89,13 @@ class MainActivity : ComponentActivity() {
             val stdoutState = remember { mutableStateOf("") }
             val stderrState = remember { mutableStateOf("") }
             val serviceState = remember { mutableStateOf("") }
-            val backupStatusState = remember { mutableStateOf("") }
             val pendingImportUri = remember { mutableStateOf<Uri?>(null) }
             val showImportConfirm = remember { mutableStateOf(false) }
-            val isCustomInstalledState = remember { mutableStateOf(NodePayload(this@MainActivity).isCustomInstalled()) }
-            val busyOperationState = remember { mutableStateOf<BusyOperation?>(null) }
-            val customStatusState = remember { mutableStateOf("") }
             val showResetConfirm = remember { mutableStateOf(false) }
             val showRemoveDataConfirm = remember { mutableStateOf(false) }
-            val removeDataStatusState = remember { mutableStateOf("") }
             val notificationGrantedState = remember { mutableStateOf(isNotificationPermissionGranted()) }
             val lifecycleOwner = LocalLifecycleOwner.current
             val scope = rememberCoroutineScope()
-            val busyMessage = when (busyOperationState.value) {
-                BusyOperation.EXPORTING -> "Exporting data…"
-                BusyOperation.IMPORTING -> "Importing data…"
-                BusyOperation.INSTALLING -> "Installing custom ST…"
-                BusyOperation.RESETTING -> "Resetting to default…"
-                BusyOperation.REMOVING_DATA -> "Removing user data…"
-                null -> ""
-            }
             val listener = remember {
                 object : NodeStatusListener {
                     override fun onStatus(status: NodeStatus) {
@@ -122,6 +108,7 @@ class MainActivity : ComponentActivity() {
 
             val service = nodeServiceState.value
             DisposableEffect(service) {
+                viewModel.nodeService = service
                 if (service != null) {
                     service.registerListener(listener)
                 }
@@ -182,17 +169,7 @@ class MainActivity : ComponentActivity() {
                 ActivityResultContracts.CreateDocument("application/gzip")
             ) { uri ->
                 if (uri == null) return@rememberLauncherForActivityResult
-                backupStatusState.value = "Exporting..."
-                busyOperationState.value = BusyOperation.EXPORTING
-                scope.launch {
-                    val result = withContext(Dispatchers.IO) {
-                        NodeBackup.exportToUri(this@MainActivity, uri)
-                    }
-                    val msg = result.getOrElse { "Export failed: ${it.message ?: "unknown error"}" }
-                    backupStatusState.value = msg
-                    busyOperationState.value = null
-                    appendServiceLog(msg)
-                }
+                viewModel.export(uri)
             }
             val importLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.OpenDocument()
@@ -205,26 +182,7 @@ class MainActivity : ComponentActivity() {
                 ActivityResultContracts.OpenDocument()
             ) { uri ->
                 if (uri == null) return@rememberLauncherForActivityResult
-                busyOperationState.value = BusyOperation.INSTALLING
-                customStatusState.value = "Starting…"
-                scope.launch {
-                    val payload = NodePayload(this@MainActivity)
-                    val result = withContext(Dispatchers.IO) {
-                        payload.installCustomFromZip(uri) { msg ->
-                            scope.launch(Dispatchers.Main) {
-                                customStatusState.value = msg
-                            }
-                        }
-                    }
-                    isCustomInstalledState.value = payload.isCustomInstalled()
-                    busyOperationState.value = null
-                    val msg = result.fold(
-                        onSuccess = { "Custom ST installed successfully." },
-                        onFailure = { "Installation failed: ${it.message ?: "unknown error"}" }
-                    )
-                    customStatusState.value = msg
-                    appendServiceLog(msg)
-                }
+                viewModel.installCustomZip(uri)
             }
 
             // Screen routing
@@ -268,11 +226,11 @@ class MainActivity : ComponentActivity() {
                     BackHandler { showAdvancedState.value = false }
                     AdvancedScreen(
                         onBack = { showAdvancedState.value = false },
-                        isCustomInstalled = isCustomInstalledState.value,
-                        customStatus = customStatusState.value,
+                        isCustomInstalled = viewModel.isCustomInstalled.value,
+                        customStatus = viewModel.customStatus.value,
                         serverRunning = statusState.value.state == NodeState.RUNNING ||
                             statusState.value.state == NodeState.STARTING,
-                        busyMessage = busyMessage,
+                        busyMessage = viewModel.busyMessage,
                         onLoadCustomZip = {
                             customZipLauncher.launch(
                                 arrayOf(
@@ -284,13 +242,13 @@ class MainActivity : ComponentActivity() {
                         },
                         onResetToDefault = { showResetConfirm.value = true },
                         onRemoveUserData = { showRemoveDataConfirm.value = true },
-                        removeDataStatus = removeDataStatusState.value
+                        removeDataStatus = viewModel.removeDataStatus.value
                     )
                 }
                 else -> {
                     STAndroidApp(
                         status = statusState.value,
-                        busyMessage = busyMessage,
+                        busyMessage = viewModel.busyMessage,
                         onStart = { startNode() },
                         onStop = { stopNode() },
                         onOpen = { openNodeUi(statusState.value.port) },
@@ -315,9 +273,9 @@ class MainActivity : ComponentActivity() {
                                 )
                             )
                         },
-                        backupStatus = backupStatusState.value,
+                        backupStatus = viewModel.backupStatus.value,
                         versionLabel = versionLabel,
-                        stLabel = if (isCustomInstalledState.value) "SillyTavern (custom version)" else stLabel,
+                        stLabel = if (viewModel.isCustomInstalled.value) "SillyTavern (custom version)" else stLabel,
                         nodeLabel = nodeLabel,
                         symlinkSupported = symlinkSupported,
                         onShowLegal = { showLegalState.value = true },
@@ -341,22 +299,7 @@ class MainActivity : ComponentActivity() {
                     confirmButton = {
                         Button(onClick = {
                             showResetConfirm.value = false
-                            busyOperationState.value = BusyOperation.RESETTING
-                            customStatusState.value = "Resetting…"
-                            scope.launch {
-                                val payload = NodePayload(this@MainActivity)
-                                val result = withContext(Dispatchers.IO) {
-                                    payload.resetToDefault()
-                                }
-                                isCustomInstalledState.value = payload.isCustomInstalled()
-                                busyOperationState.value = null
-                                val msg = result.fold(
-                                    onSuccess = { "Reset to default complete." },
-                                    onFailure = { "Reset failed: ${it.message ?: "unknown error"}" }
-                                )
-                                customStatusState.value = msg
-                                appendServiceLog(msg)
-                            }
+                            viewModel.resetToDefault()
                         }) {
                             Text(text = "Reset")
                         }
@@ -382,19 +325,7 @@ class MainActivity : ComponentActivity() {
                     confirmButton = {
                         Button(onClick = {
                             showRemoveDataConfirm.value = false
-                            removeDataStatusState.value = "Removing data…"
-                            busyOperationState.value = BusyOperation.REMOVING_DATA
-                            scope.launch {
-                                val paths = AppPaths(this@MainActivity)
-                                withContext(Dispatchers.IO) {
-                                    paths.configDir.deleteRecursively()
-                                    paths.dataDir.deleteRecursively()
-                                }
-                                val msg = "User data removed."
-                                removeDataStatusState.value = msg
-                                busyOperationState.value = null
-                                appendServiceLog(msg)
-                            }
+                            viewModel.removeUserData()
                         }) {
                             Text(text = "Remove")
                         }
@@ -422,29 +353,7 @@ class MainActivity : ComponentActivity() {
                             showImportConfirm.value = false
                             pendingImportUri.value = null
                             if (uri == null) return@Button
-                            backupStatusState.value = "Importing..."
-                            busyOperationState.value = BusyOperation.IMPORTING
-                            scope.launch {
-                                val importResult = withContext(Dispatchers.IO) {
-                                    NodeBackup.importFromUri(this@MainActivity, uri)
-                                }
-                                val postInstallResult = if (importResult.isSuccess) {
-                                    val serviceResult = nodeServiceState.value?.runPostInstallNow()
-                                    serviceResult ?: Result.failure(IllegalStateException("Service not available"))
-                                } else {
-                                    Result.success(Unit)
-                                }
-                                val msg = when {
-                                    importResult.isFailure ->
-                                        "Import failed: ${importResult.exceptionOrNull()?.message ?: "unknown error"}"
-                                    postInstallResult.isFailure ->
-                                        "Import complete, post-install failed: ${postInstallResult.exceptionOrNull()?.message ?: "unknown error"}"
-                                    else -> "Import complete"
-                                }
-                                backupStatusState.value = msg
-                                busyOperationState.value = null
-                                appendServiceLog(msg)
-                            }
+                            viewModel.import(uri)
                         }) {
                             Text(text = "Import")
                         }
@@ -459,15 +368,6 @@ class MainActivity : ComponentActivity() {
                     }
                 )
             }
-        }
-    }
-
-    private suspend fun appendServiceLog(message: String) {
-        withContext(Dispatchers.IO) {
-            val logsDir = AppPaths(this@MainActivity).logsDir
-            if (!logsDir.exists()) logsDir.mkdirs()
-            val logFile = File(logsDir, "service.log")
-            logFile.appendText("${System.currentTimeMillis()}: $message\n", Charsets.UTF_8)
         }
     }
 

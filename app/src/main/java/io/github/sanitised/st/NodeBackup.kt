@@ -84,22 +84,41 @@ object NodeBackup {
 
             val configDest = paths.configFile
             val dataDest = paths.dataDir
-            if (configDest.exists()) {
-                configDest.delete()
-            }
-            if (dataDest.exists()) {
-                dataDest.deleteRecursively()
-            }
 
-            if (configSrc.exists()) {
-                configDest.parentFile?.mkdirs()
-                configSrc.copyTo(configDest, overwrite = true)
-            }
+            // Atomic swap for data directory: rename old aside, rename new in.
+            // renameTo within the same filesystem is atomic at the OS level,
+            // so no partial state is visible even if the process is killed.
             if (dataSrc.exists()) {
-                dataDest.parentFile?.mkdirs()
-                dataSrc.copyRecursively(dataDest, overwrite = true)
+                val oldDataDir = File(tmpRoot, "import_data_old")
+                if (oldDataDir.exists()) oldDataDir.deleteRecursively()
+                if (dataDest.exists()) {
+                    if (!dataDest.renameTo(oldDataDir)) {
+                        dataDest.deleteRecursively()
+                    }
+                }
+                if (!dataSrc.renameTo(dataDest)) {
+                    dataDest.parentFile?.mkdirs()
+                    dataSrc.copyRecursively(dataDest, overwrite = true)
+                }
+                if (oldDataDir.exists()) oldDataDir.deleteRecursively()
             } else {
                 dataDest.mkdirs()
+            }
+
+            // Atomic swap for config file.
+            if (configSrc.exists()) {
+                configDest.parentFile?.mkdirs()
+                val oldConfig = File(tmpRoot, "import_config_old.yaml")
+                if (oldConfig.exists()) oldConfig.delete()
+                if (configDest.exists()) {
+                    if (!configDest.renameTo(oldConfig)) {
+                        configDest.delete()
+                    }
+                }
+                if (!configSrc.renameTo(configDest)) {
+                    configSrc.copyTo(configDest, overwrite = true)
+                }
+                if (oldConfig.exists()) oldConfig.delete()
             }
 
             importDir.deleteRecursively()

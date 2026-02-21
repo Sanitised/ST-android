@@ -121,5 +121,6 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
