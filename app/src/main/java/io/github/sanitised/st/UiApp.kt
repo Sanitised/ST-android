@@ -62,6 +62,19 @@ fun STAndroidApp(
     nodeLabel: String,
     symlinkSupported: Boolean,
     onShowLegal: () -> Unit,
+    showAutoCheckOptInPrompt: Boolean,
+    onEnableAutoCheck: () -> Unit,
+    onLaterAutoCheck: () -> Unit,
+    showUpdatePrompt: Boolean,
+    updateVersionLabel: String,
+    updateDetails: String,
+    isDownloadingUpdate: Boolean,
+    downloadProgressPercent: Int?,
+    isUpdateReadyToInstall: Boolean,
+    onUpdatePrimary: () -> Unit,
+    onUpdateDismiss: () -> Unit,
+    onCancelUpdateDownload: () -> Unit,
+    onShowUpdateSettings: () -> Unit,
     onShowAdvanced: () -> Unit
 ) {
     MaterialTheme {
@@ -235,9 +248,43 @@ fun STAndroidApp(
                             }
                         }
                     }
+                    if (showAutoCheckOptInPrompt) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        AutoCheckOptInCard(
+                            visible = true,
+                            onEnable = onEnableAutoCheck,
+                            onLater = onLaterAutoCheck
+                        )
+                    }
                     Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedButton(onClick = onShowAdvanced) {
-                        Text(text = "Advanced")
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedButton(
+                            onClick = onShowUpdateSettings,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(text = "Update Settings")
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        OutlinedButton(
+                            onClick = onShowAdvanced,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(text = "Advanced")
+                        }
+                    }
+                    if (showUpdatePrompt) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        UpdatePromptCard(
+                            visible = true,
+                            versionLabel = updateVersionLabel,
+                            details = updateDetails,
+                            isDownloading = isDownloadingUpdate,
+                            downloadProgressPercent = downloadProgressPercent,
+                            isReadyToInstall = isUpdateReadyToInstall,
+                            onPrimary = onUpdatePrimary,
+                            onDismiss = onUpdateDismiss,
+                            onCancelDownload = onCancelUpdateDownload
+                        )
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                 }
@@ -322,6 +369,19 @@ private fun STAndroidAppPreview() {
         nodeLabel = "Node v24.13.0",
         symlinkSupported = true,
         onShowLegal = {},
+        showAutoCheckOptInPrompt = false,
+        onEnableAutoCheck = {},
+        onLaterAutoCheck = {},
+        showUpdatePrompt = false,
+        updateVersionLabel = "",
+        updateDetails = "",
+        isDownloadingUpdate = false,
+        downloadProgressPercent = null,
+        isUpdateReadyToInstall = false,
+        onUpdatePrimary = {},
+        onUpdateDismiss = {},
+        onCancelUpdateDownload = {},
+        onShowUpdateSettings = {},
         onShowAdvanced = {}
     )
 }

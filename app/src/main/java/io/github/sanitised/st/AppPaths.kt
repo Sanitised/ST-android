@@ -13,6 +13,7 @@ class AppPaths(private val context: Context) {
     val configFile: File get() = File(configDir, "config.yaml")
     val dataDir: File get() = File(filesDir, "data")
     val tmpDir: File get() = File(filesDir, "tmp")
+    val updatesDir: File get() = File(filesDir, "updates")
     val nodeTmpDir: File get() = File(cacheDir, "node_tmp")
 
     val npmDir: File get() = File(filesDir, "npm")

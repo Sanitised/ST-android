@@ -85,6 +85,7 @@ class MainActivity : ComponentActivity() {
             val showConfigState = remember { mutableStateOf(false) }
             val showLegalState = remember { mutableStateOf(false) }
             val showLicenseState = remember { mutableStateOf<LegalDoc?>(null) }
+            val showUpdateSettingsState = remember { mutableStateOf(false) }
             val showAdvancedState = remember { mutableStateOf(false) }
             val stdoutState = remember { mutableStateOf("") }
             val stderrState = remember { mutableStateOf("") }
@@ -140,6 +141,12 @@ class MainActivity : ComponentActivity() {
                     delay(1000)
                 }
             }
+            LaunchedEffect(Unit) {
+                viewModel.maybeAutoCheckForUpdates()
+            }
+            val showAutoCheckOptInPrompt = viewModel.shouldShowAutoCheckOptInPrompt()
+            val showUpdatePrompt = viewModel.shouldShowUpdatePrompt()
+            val isUpdateReadyToInstall = viewModel.isAvailableUpdateDownloaded()
 
             val legalDocs = remember {
                 listOf(
@@ -222,6 +229,34 @@ class MainActivity : ComponentActivity() {
                         configFile = AppPaths(this).configFile
                     )
                 }
+                showUpdateSettingsState.value -> {
+                    BackHandler { showUpdateSettingsState.value = false }
+                    UpdateSettingsScreen(
+                        onBack = { showUpdateSettingsState.value = false },
+                        autoCheckEnabled = viewModel.autoCheckForUpdates.value,
+                        onAutoCheckChanged = { enabled -> viewModel.setAutoCheckForUpdates(enabled) },
+                        channel = viewModel.updateChannel.value,
+                        onChannelChanged = { channel -> viewModel.setUpdateChannel(channel) },
+                        onCheckNow = { viewModel.checkForUpdates("manual") },
+                        isChecking = viewModel.isCheckingForUpdates.value,
+                        statusMessage = viewModel.updateCheckStatus.value,
+                        showUpdatePrompt = showUpdatePrompt,
+                        updateVersionLabel = viewModel.availableUpdateVersionLabel(),
+                        updateDetails = viewModel.updateBannerMessage.value,
+                        isDownloadingUpdate = viewModel.isDownloadingUpdate.value,
+                        downloadProgressPercent = viewModel.downloadProgressPercent.value,
+                        isUpdateReadyToInstall = isUpdateReadyToInstall,
+                        onUpdatePrimary = {
+                            if (isUpdateReadyToInstall) {
+                                viewModel.installDownloadedUpdate(this@MainActivity)
+                            } else {
+                                viewModel.startAvailableUpdateDownload()
+                            }
+                        },
+                        onUpdateDismiss = { viewModel.dismissAvailableUpdatePrompt() },
+                        onCancelUpdateDownload = { viewModel.cancelUpdateDownload() }
+                    )
+                }
                 showAdvancedState.value -> {
                     BackHandler { showAdvancedState.value = false }
                     AdvancedScreen(
@@ -279,6 +314,25 @@ class MainActivity : ComponentActivity() {
                         nodeLabel = nodeLabel,
                         symlinkSupported = symlinkSupported,
                         onShowLegal = { showLegalState.value = true },
+                        showAutoCheckOptInPrompt = showAutoCheckOptInPrompt,
+                        onEnableAutoCheck = { viewModel.acceptAutoCheckOptInPrompt() },
+                        onLaterAutoCheck = { viewModel.dismissAutoCheckOptInPrompt() },
+                        showUpdatePrompt = showUpdatePrompt,
+                        updateVersionLabel = viewModel.availableUpdateVersionLabel(),
+                        updateDetails = viewModel.updateBannerMessage.value,
+                        isDownloadingUpdate = viewModel.isDownloadingUpdate.value,
+                        downloadProgressPercent = viewModel.downloadProgressPercent.value,
+                        isUpdateReadyToInstall = isUpdateReadyToInstall,
+                        onUpdatePrimary = {
+                            if (isUpdateReadyToInstall) {
+                                viewModel.installDownloadedUpdate(this@MainActivity)
+                            } else {
+                                viewModel.startAvailableUpdateDownload()
+                            }
+                        },
+                        onUpdateDismiss = { viewModel.dismissAvailableUpdatePrompt() },
+                        onCancelUpdateDownload = { viewModel.cancelUpdateDownload() },
+                        onShowUpdateSettings = { showUpdateSettingsState.value = true },
                         onShowAdvanced = { showAdvancedState.value = true }
                     )
                 }
