@@ -279,6 +279,7 @@ class MainActivity : ComponentActivity() {
                     ManageStScreen(
                         onBack = { showManageStState.value = false },
                         isCustomInstalled = viewModel.isCustomInstalled.value,
+                        customInstalledLabel = viewModel.customInstallLabel.value,
                         customStatus = viewModel.customStatus.value,
                         serverRunning = statusState.value.state == NodeState.RUNNING ||
                             statusState.value.state == NodeState.STARTING,
@@ -286,6 +287,20 @@ class MainActivity : ComponentActivity() {
                         onExport = triggerExport,
                         onImport = triggerImport,
                         backupStatus = viewModel.backupStatus.value,
+                        customRepoInput = viewModel.customRepoInput.value,
+                        onCustomRepoInputChanged = { viewModel.setCustomRepoInput(it) },
+                        onLoadRepoRefs = { viewModel.loadCustomRepoRefs() },
+                        isLoadingRepoRefs = viewModel.isLoadingCustomRefs.value,
+                        customRefStatus = viewModel.customRefStatus.value,
+                        featuredRefs = viewModel.customFeaturedRefs.value,
+                        allRefs = viewModel.customAllRefs.value,
+                        selectedRefKey = viewModel.selectedCustomRefKey.value,
+                        onSelectRepoRef = { key -> viewModel.selectCustomRepoRef(key) },
+                        onDownloadAndInstallRef = { viewModel.startCustomRepoInstall() },
+                        isDownloadingCustomSource = viewModel.isDownloadingCustomSource.value,
+                        customSourceProgressPercent = viewModel.customSourceProgressPercent.value,
+                        customSourceStatus = viewModel.customSourceStatus.value,
+                        onCancelCustomSourceDownload = { viewModel.cancelCustomSourceDownload() },
                         onLoadCustomZip = {
                             customZipLauncher.launch(
                                 arrayOf(
@@ -312,7 +327,14 @@ class MainActivity : ComponentActivity() {
                         onEditConfig = { showConfigState.value = true },
                         showNotificationPrompt = !notificationGrantedState.value,
                         versionLabel = versionLabel,
-                        stLabel = if (viewModel.isCustomInstalled.value) "SillyTavern (custom version)" else stLabel,
+                        stLabel = if (viewModel.isCustomInstalled.value) {
+                            val customLabel = viewModel.customInstallLabel.value
+                            if (customLabel.isNullOrBlank()) {
+                                "SillyTavern (custom version)"
+                            } else {
+                                "SillyTavern ($customLabel)"
+                            }
+                        } else stLabel,
                         nodeLabel = nodeLabel,
                         symlinkSupported = symlinkSupported,
                         onShowLegal = { showLegalState.value = true },
@@ -334,6 +356,10 @@ class MainActivity : ComponentActivity() {
                         },
                         onUpdateDismiss = { viewModel.dismissAvailableUpdatePrompt() },
                         onCancelUpdateDownload = { viewModel.cancelUpdateDownload() },
+                        showCustomSourceDownload = viewModel.isDownloadingCustomSource.value,
+                        customSourceDownloadPercent = viewModel.customSourceProgressPercent.value,
+                        customSourceStatus = viewModel.customSourceStatus.value,
+                        onCancelCustomSourceDownload = { viewModel.cancelCustomSourceDownload() },
                         onShowSettings = { showSettingsState.value = true },
                         onShowManageSt = { showManageStState.value = true }
                     )

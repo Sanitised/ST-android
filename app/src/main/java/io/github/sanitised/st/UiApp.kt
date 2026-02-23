@@ -71,6 +71,10 @@ fun STAndroidApp(
     onUpdatePrimary: () -> Unit,
     onUpdateDismiss: () -> Unit,
     onCancelUpdateDownload: () -> Unit,
+    showCustomSourceDownload: Boolean,
+    customSourceDownloadPercent: Int?,
+    customSourceStatus: String,
+    onCancelCustomSourceDownload: () -> Unit,
     onShowSettings: () -> Unit,
     onShowManageSt: () -> Unit
 ) {
@@ -239,6 +243,15 @@ fun STAndroidApp(
                             onCancelDownload = onCancelUpdateDownload
                         )
                     }
+                    if (showCustomSourceDownload) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        CustomSourceDownloadCard(
+                            visible = true,
+                            details = customSourceStatus,
+                            downloadProgressPercent = customSourceDownloadPercent,
+                            onCancelDownload = onCancelCustomSourceDownload
+                        )
+                    }
                     Spacer(modifier = Modifier.height(8.dp))
                 }
 
@@ -331,6 +344,10 @@ private fun STAndroidAppPreview() {
         onUpdatePrimary = {},
         onUpdateDismiss = {},
         onCancelUpdateDownload = {},
+        showCustomSourceDownload = false,
+        customSourceDownloadPercent = null,
+        customSourceStatus = "",
+        onCancelCustomSourceDownload = {},
         onShowSettings = {},
         onShowManageSt = {}
     )

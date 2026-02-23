@@ -8,13 +8,27 @@ import java.io.BufferedInputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
+import java.nio.file.LinkOption
 import java.nio.file.Files
 import java.util.concurrent.TimeUnit
 import java.util.zip.GZIPInputStream
 import java.util.zip.ZipInputStream
+import kotlin.io.path.ExperimentalPathApi
+import kotlin.io.path.deleteRecursively
 import org.json.JSONObject
 
+@OptIn(ExperimentalPathApi::class)
 class NodePayload(private val context: Context) {
+    companion object {
+        private const val PAYLOAD_PREFS = "payload"
+        private const val PREF_CUSTOM_INSTALLED = "custom_installed"
+        private const val PREF_ST_PAYLOAD_VERSION = "st_payload_version"
+        private const val PREF_CUSTOM_SOURCE_REPO = "custom_source_repo"
+        private const val PREF_CUSTOM_SOURCE_REF_TYPE = "custom_source_ref_type"
+        private const val PREF_CUSTOM_SOURCE_REF_NAME = "custom_source_ref_name"
+        private const val PREF_CUSTOM_SOURCE_COMMIT = "custom_source_commit"
+    }
+
     data class ManifestInfo(
         val payloadVersion: String?,
         val stVersion: String?,
@@ -34,6 +48,13 @@ class NodePayload(private val context: Context) {
         val dataDir: File,
         val payloadUpdated: Boolean,
         val payloadVersion: String?
+    )
+
+    data class CustomInstallInfo(
+        val repo: String,
+        val refType: String,
+        val refName: String,
+        val commitSha: String?
     )
 
     fun ensureExtracted(): Result<Layout> {
@@ -226,14 +247,24 @@ class NodePayload(private val context: Context) {
     }
 
     private fun getInstalledPayloadVersion(): String? {
-        val prefs = context.getSharedPreferences("payload", Context.MODE_PRIVATE)
-        return prefs.getString("st_payload_version", null)
+        val prefs = payloadPrefs()
+        return prefs.getString(PREF_ST_PAYLOAD_VERSION, null)
     }
 
     private fun setInstalledPayloadVersion(version: String?) {
         if (version == null) return
-        val prefs = context.getSharedPreferences("payload", Context.MODE_PRIVATE)
-        prefs.edit().putString("st_payload_version", version).apply()
+        val prefs = payloadPrefs()
+        prefs.edit().putString(PREF_ST_PAYLOAD_VERSION, version).apply()
+    }
+
+    private fun payloadPrefs() =
+        context.getSharedPreferences(PAYLOAD_PREFS, Context.MODE_PRIVATE)
+
+    private fun clearCustomInstallMetadata(edit: android.content.SharedPreferences.Editor) {
+        edit.remove(PREF_CUSTOM_SOURCE_REPO)
+            .remove(PREF_CUSTOM_SOURCE_REF_TYPE)
+            .remove(PREF_CUSTOM_SOURCE_REF_NAME)
+            .remove(PREF_CUSTOM_SOURCE_COMMIT)
     }
 
     private fun extractStBundle(assetPath: String) {
@@ -241,7 +272,7 @@ class NodePayload(private val context: Context) {
         val tmpRoot = paths.tmpDir
         val tmpDir = File(tmpRoot, "st_new")
         if (tmpDir.exists()) {
-            tmpDir.deleteRecursively()
+            tmpDir.toPath().deleteRecursively()
         }
         tmpDir.mkdirs()
         extractTarFromAssets(assetPath, tmpDir)
@@ -253,20 +284,20 @@ class NodePayload(private val context: Context) {
         val stDir = paths.stDir
         val oldDir = File(tmpRoot, "st_old")
         if (oldDir.exists()) {
-            oldDir.deleteRecursively()
+            oldDir.toPath().deleteRecursively()
         }
         if (stDir.exists()) {
             if (!stDir.renameTo(oldDir)) {
-                stDir.deleteRecursively()
+                stDir.toPath().deleteRecursively()
             }
         }
         val promoted = extractedRoot.renameTo(stDir)
         if (!promoted) {
             extractedRoot.copyRecursively(stDir, overwrite = true)
-            extractedRoot.deleteRecursively()
+            extractedRoot.toPath().deleteRecursively()
         }
         if (oldDir.exists()) {
-            oldDir.deleteRecursively()
+            oldDir.toPath().deleteRecursively()
         }
     }
 
@@ -369,8 +400,34 @@ class NodePayload(private val context: Context) {
     // -------------------------------------------------------------------------
 
     fun isCustomInstalled(): Boolean {
-        return context.getSharedPreferences("payload", Context.MODE_PRIVATE)
-            .getBoolean("custom_installed", false)
+        return payloadPrefs().getBoolean(PREF_CUSTOM_INSTALLED, false)
+    }
+
+    fun getCustomInstallInfo(): CustomInstallInfo? {
+        if (!isCustomInstalled()) return null
+        val prefs = payloadPrefs()
+        val repo = prefs.getString(PREF_CUSTOM_SOURCE_REPO, null)?.trim().orEmpty()
+        val refType = prefs.getString(PREF_CUSTOM_SOURCE_REF_TYPE, null)?.trim().orEmpty()
+        val refName = prefs.getString(PREF_CUSTOM_SOURCE_REF_NAME, null)?.trim().orEmpty()
+        val commitSha = prefs.getString(PREF_CUSTOM_SOURCE_COMMIT, null)?.trim()
+            .takeIf { !it.isNullOrBlank() }
+        if (repo.isBlank() || refType.isBlank() || refName.isBlank()) return null
+        return CustomInstallInfo(
+            repo = repo,
+            refType = refType,
+            refName = refName,
+            commitSha = commitSha
+        )
+    }
+
+    fun getCustomInstallLabel(): String? {
+        val info = getCustomInstallInfo() ?: return null
+        val shortSha = info.commitSha?.take(7)
+        return if (shortSha.isNullOrBlank()) {
+            "${info.refType}/${info.refName}"
+        } else {
+            "${info.refType}/${info.refName}-$shortSha"
+        }
     }
 
     /**
@@ -383,6 +440,36 @@ class NodePayload(private val context: Context) {
      * the main thread themselves if needed.
      */
     fun installCustomFromZip(uri: Uri, onProgress: (String) -> Unit): Result<Unit> {
+        return installCustomFromZipInternal(
+            sourceInfo = null,
+            onProgress = onProgress
+        ) {
+            context.contentResolver.openInputStream(uri)
+                ?: throw IllegalStateException("Cannot open the selected file.")
+        }
+    }
+
+    fun installCustomFromZipFile(
+        zipFile: File,
+        onProgress: (String) -> Unit,
+        sourceInfo: CustomInstallInfo?
+    ): Result<Unit> {
+        return installCustomFromZipInternal(
+            sourceInfo = sourceInfo,
+            onProgress = onProgress
+        ) {
+            if (!zipFile.exists()) {
+                throw IllegalStateException("Downloaded archive not found.")
+            }
+            zipFile.inputStream()
+        }
+    }
+
+    private fun installCustomFromZipInternal(
+        sourceInfo: CustomInstallInfo?,
+        onProgress: (String) -> Unit,
+        openInputStream: () -> InputStream
+    ): Result<Unit> {
         return runCatching {
             val paths = AppPaths(context)
             val tmpRoot = paths.tmpDir
@@ -392,11 +479,11 @@ class NodePayload(private val context: Context) {
             try {
                 // 1. Extract ZIP
                 onProgress("Extracting archive…")
-                if (extractDir.exists()) extractDir.deleteRecursively()
+                if (extractDir.exists()) extractDir.toPath().deleteRecursively()
                 extractDir.mkdirs()
-                context.contentResolver.openInputStream(uri)
-                    ?.use { input -> extractZipToDir(input, extractDir) }
-                    ?: throw IllegalStateException("Cannot open the selected file.")
+                openInputStream().use { input ->
+                    extractZipToDir(input, extractDir)
+                }
 
                 // 2. Locate server.js (handle GitHub's top-level directory wrapper)
                 val stRoot = findStRoot(extractDir)
@@ -425,15 +512,15 @@ class NodePayload(private val context: Context) {
                 onProgress("Installing…")
                 val stDir = paths.stDir
                 val oldDir = File(tmpRoot, "custom_old")
-                if (oldDir.exists()) oldDir.deleteRecursively()
+                if (oldDir.exists()) oldDir.toPath().deleteRecursively()
                 if (stDir.exists()) {
-                    if (!stDir.renameTo(oldDir)) stDir.deleteRecursively()
+                    if (!stDir.renameTo(oldDir)) stDir.toPath().deleteRecursively()
                 }
                 if (!stRoot.renameTo(stDir)) {
                     stRoot.copyRecursively(stDir, overwrite = true)
-                    stRoot.deleteRecursively()
+                    stRoot.toPath().deleteRecursively()
                 }
-                if (oldDir.exists()) oldDir.deleteRecursively()
+                if (oldDir.exists()) oldDir.toPath().deleteRecursively()
 
                 // 6. Re-create symlinks so user data paths stay correct
                 val configDir = paths.configDir
@@ -445,15 +532,27 @@ class NodePayload(private val context: Context) {
 
                 // 7. Persist custom flag; clear bundled-version stamp so a
                 //    future reset will force re-extraction of the bundled tar.
-                context.getSharedPreferences("payload", Context.MODE_PRIVATE).edit()
-                    .putBoolean("custom_installed", true)
-                    .remove("st_payload_version")
-                    .apply()
+                val edit = payloadPrefs().edit()
+                    .putBoolean(PREF_CUSTOM_INSTALLED, true)
+                    .remove(PREF_ST_PAYLOAD_VERSION)
+                if (sourceInfo == null) {
+                    clearCustomInstallMetadata(edit)
+                } else {
+                    edit.putString(PREF_CUSTOM_SOURCE_REPO, sourceInfo.repo)
+                    edit.putString(PREF_CUSTOM_SOURCE_REF_TYPE, sourceInfo.refType)
+                    edit.putString(PREF_CUSTOM_SOURCE_REF_NAME, sourceInfo.refName)
+                    if (sourceInfo.commitSha.isNullOrBlank()) {
+                        edit.remove(PREF_CUSTOM_SOURCE_COMMIT)
+                    } else {
+                        edit.putString(PREF_CUSTOM_SOURCE_COMMIT, sourceInfo.commitSha)
+                    }
+                }
+                edit.apply()
 
                 onProgress("Done!")
             } finally {
                 // Best-effort cleanup of the temp extraction directory.
-                if (extractDir.exists()) extractDir.deleteRecursively()
+                if (extractDir.exists()) extractDir.toPath().deleteRecursively()
             }
         }
     }
@@ -465,11 +564,14 @@ class NodePayload(private val context: Context) {
     fun resetToDefault(): Result<Unit> {
         return runCatching {
             val paths = AppPaths(context)
-            context.getSharedPreferences("payload", Context.MODE_PRIVATE).edit()
-                .remove("custom_installed")
-                .remove("st_payload_version")
-                .apply()
-            paths.stDir.deleteRecursively()
+            val edit = payloadPrefs().edit()
+                .remove(PREF_CUSTOM_INSTALLED)
+                .remove(PREF_ST_PAYLOAD_VERSION)
+            clearCustomInstallMetadata(edit)
+            edit.apply()
+            if (Files.exists(paths.stDir.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+                paths.stDir.toPath().deleteRecursively()
+            }
             ensureExtracted().getOrThrow()
         }
     }

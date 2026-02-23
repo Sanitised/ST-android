@@ -25,7 +25,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 internal enum class BusyOperation {
-    EXPORTING, IMPORTING, INSTALLING, RESETTING, REMOVING_DATA
+    EXPORTING, IMPORTING, INSTALLING, RESETTING, REMOVING_DATA, DOWNLOADING_CUSTOM_SOURCE
 }
 
 enum class UpdateChannel(val storageValue: String) {
@@ -62,6 +62,28 @@ private data class UpdateCheckOutcome(
     val updateNeeded: Boolean
 )
 
+private enum class GithubRefType(val storageValue: String, val archivePrefix: String) {
+    BRANCH("branch", "heads"),
+    TAG("tag", "tags")
+}
+
+private data class GithubRepoRef(
+    val type: GithubRefType,
+    val name: String,
+    val commitSha: String?
+) {
+    val key: String
+        get() = "${type.storageValue}:$name"
+}
+
+data class CustomRepoRefOption(
+    val key: String,
+    val label: String,
+    val refType: String,
+    val refName: String,
+    val commitSha: String?
+)
+
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     companion object {
         private const val TAG = "UpdateCheck"
@@ -74,20 +96,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         private const val PREF_UPDATE_DISMISSED_UNTIL_MS = "update_dismissed_until_ms"
         private const val GITHUB_OWNER = "Sanitised"
         private const val GITHUB_REPO = "ST-android"
+        private const val DEFAULT_CUSTOM_ST_REPO = "SillyTavern/SillyTavern"
+        private const val MAX_GITHUB_PAGES = 5
+        private const val MAX_FEATURED_REFS = 6
         private const val DOWNLOAD_BUFFER_SIZE = 16 * 1024
         private const val ONE_DAY_MS = 24L * 60L * 60L * 1000L
         private const val THREE_DAYS_MS = 72L * 60L * 60L * 1000L
     }
 
     private val updatePrefs = application.getSharedPreferences(UPDATE_PREFS_NAME, Context.MODE_PRIVATE)
+    private val payload = NodePayload(application)
 
     internal val busyOperation = mutableStateOf<BusyOperation?>(null)
     val backupStatus = mutableStateOf("")
     val customStatus = mutableStateOf("")
     val removeDataStatus = mutableStateOf("")
     val isCustomInstalled = mutableStateOf(
-        NodePayload(application).isCustomInstalled()
+        payload.isCustomInstalled()
     )
+    val customInstallLabel = mutableStateOf(payload.getCustomInstallLabel())
+    val customRepoInput = mutableStateOf(DEFAULT_CUSTOM_ST_REPO)
+    val isLoadingCustomRefs = mutableStateOf(false)
+    val customRefStatus = mutableStateOf("")
+    val customFeaturedRefs = mutableStateOf<List<CustomRepoRefOption>>(emptyList())
+    val customAllRefs = mutableStateOf<List<CustomRepoRefOption>>(emptyList())
+    val selectedCustomRefKey = mutableStateOf<String?>(null)
+    val isDownloadingCustomSource = mutableStateOf(false)
+    val customSourceProgressPercent = mutableStateOf<Int?>(null)
+    val customSourceStatus = mutableStateOf("")
     val autoCheckForUpdates = mutableStateOf(
         updatePrefs.getBoolean(PREF_AUTO_CHECK, false)
     )
@@ -115,12 +151,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private var autoCheckAttempted = false
     private var updateDownloadJob: Job? = null
+    private var customSourceDownloadJob: Job? = null
 
     // Updated by MainActivity when the service connection changes.
     var nodeService: NodeService? = null
 
     override fun onCleared() {
         updateDownloadJob?.cancel()
+        customSourceDownloadJob?.cancel()
         super.onCleared()
     }
 
@@ -131,6 +169,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             BusyOperation.INSTALLING -> "Installing custom ST…"
             BusyOperation.RESETTING -> "Resetting to default…"
             BusyOperation.REMOVING_DATA -> "Removing user data…"
+            BusyOperation.DOWNLOADING_CUSTOM_SOURCE -> "Downloading custom ST source…"
             null -> ""
         }
 
@@ -177,10 +216,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun installCustomZip(uri: Uri) {
+        if (busyOperation.value != null) return
         busyOperation.value = BusyOperation.INSTALLING
         customStatus.value = "Starting…"
         viewModelScope.launch {
-            val payload = NodePayload(getApplication())
             val result = withContext(Dispatchers.IO) {
                 payload.installCustomFromZip(uri) { msg ->
                     viewModelScope.launch(Dispatchers.Main) {
@@ -188,7 +227,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
             }
-            isCustomInstalled.value = payload.isCustomInstalled()
+            refreshCustomInstallState()
             busyOperation.value = null
             val msg = result.fold(
                 onSuccess = { "Custom ST installed successfully." },
@@ -200,14 +239,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun resetToDefault() {
+        if (busyOperation.value != null) return
         busyOperation.value = BusyOperation.RESETTING
         customStatus.value = "Resetting…"
         viewModelScope.launch {
-            val payload = NodePayload(getApplication())
             val result = withContext(Dispatchers.IO) {
                 payload.resetToDefault()
             }
-            isCustomInstalled.value = payload.isCustomInstalled()
+            refreshCustomInstallState()
             busyOperation.value = null
             val msg = result.fold(
                 onSuccess = { "Reset to default complete." },
@@ -216,6 +255,184 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             customStatus.value = msg
             appendServiceLog(msg)
         }
+    }
+
+    fun setCustomRepoInput(value: String) {
+        customRepoInput.value = value
+    }
+
+    fun selectCustomRepoRef(key: String) {
+        selectedCustomRefKey.value = key
+        val selected = selectedCustomRef()
+        if (selected != null) {
+            customRefStatus.value = "Selected ${selected.refType} ${selected.refName}"
+        }
+    }
+
+    fun loadCustomRepoRefs() {
+        if (isLoadingCustomRefs.value || isDownloadingCustomSource.value) return
+        if (busyOperation.value != null && busyOperation.value != BusyOperation.DOWNLOADING_CUSTOM_SOURCE) {
+            customRefStatus.value = "Wait for the current operation to finish."
+            return
+        }
+        val parsedRepo = parseGithubRepoInput(customRepoInput.value)
+        if (parsedRepo == null) {
+            customRefStatus.value = "Repo must be in owner/repo format."
+            customFeaturedRefs.value = emptyList()
+            customAllRefs.value = emptyList()
+            selectedCustomRefKey.value = null
+            return
+        }
+        customRefStatus.value = "Loading branches and tags..."
+        isLoadingCustomRefs.value = true
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    fetchCustomRepoRefs(parsedRepo.first, parsedRepo.second)
+                }
+            }.onSuccess { refsResult ->
+                val featured = refsResult.first.map { it.toUiOption() }
+                val all = refsResult.second.map { it.toUiOption() }
+                customFeaturedRefs.value = featured
+                customAllRefs.value = all
+                val selected = selectedCustomRefKey.value
+                selectedCustomRefKey.value = when {
+                    selected != null && all.any { it.key == selected } -> selected
+                    featured.isNotEmpty() -> featured.first().key
+                    all.isNotEmpty() -> all.first().key
+                    else -> null
+                }
+                customRefStatus.value = when {
+                    all.isEmpty() -> "No branches or tags found."
+                    else -> "Loaded ${all.size} refs from ${parsedRepo.first}/${parsedRepo.second}."
+                }
+            }.onFailure { error ->
+                customFeaturedRefs.value = emptyList()
+                customAllRefs.value = emptyList()
+                selectedCustomRefKey.value = null
+                customRefStatus.value = "Failed to load refs: ${error.message ?: "unknown error"}"
+                viewModelScope.launch {
+                    appendServiceLog("custom-refs: failed: ${error.message ?: "unknown error"}")
+                }
+            }
+            isLoadingCustomRefs.value = false
+        }
+    }
+
+    fun startCustomRepoInstall() {
+        if (isDownloadingCustomSource.value) return
+        if (busyOperation.value != null) {
+            customStatus.value = "Wait for the current operation to finish."
+            return
+        }
+        val parsedRepo = parseGithubRepoInput(customRepoInput.value)
+        if (parsedRepo == null) {
+            customStatus.value = "Repo must be in owner/repo format."
+            return
+        }
+        val selectedRef = selectedCustomRef()
+        if (selectedRef == null) {
+            customStatus.value = "Select a branch or tag first."
+            return
+        }
+
+        customSourceDownloadJob?.cancel()
+        busyOperation.value = BusyOperation.DOWNLOADING_CUSTOM_SOURCE
+        isDownloadingCustomSource.value = true
+        customSourceProgressPercent.value = 0
+        customSourceStatus.value = "Downloading ${selectedRef.refType} ${selectedRef.refName}..."
+        customStatus.value = customSourceStatus.value
+
+        customSourceDownloadJob = viewModelScope.launch {
+            val (owner, repo) = parsedRepo
+            val safeRepo = "${owner}_${repo}".replace(Regex("[^A-Za-z0-9._-]"), "_")
+            val safeRef = selectedRef.refName.replace(Regex("[^A-Za-z0-9._-]"), "_")
+            val tempDir = AppPaths(getApplication()).updatesDir.also { it.mkdirs() }
+            val zipFile = File(tempDir, "st-src-$safeRepo-$safeRef.zip")
+            val archiveRefName = Uri.encode(selectedRef.refName)
+            val downloadUrl = "https://codeload.github.com/$owner/$repo/zip/refs/${selectedRef.refTypePath}/$archiveRefName"
+
+            try {
+                withContext(Dispatchers.IO) {
+                    downloadCustomSourceZip(
+                        downloadUrl = downloadUrl,
+                        outputFile = zipFile
+                    ) { downloadedBytes, totalBytes ->
+                        withContext(Dispatchers.Main) {
+                            val progress = if (totalBytes != null && totalBytes > 0L) {
+                                ((downloadedBytes * 100L) / totalBytes).toInt().coerceIn(0, 100)
+                            } else {
+                                null
+                            }
+                            customSourceProgressPercent.value = progress
+                            val downloadedLabel = formatByteCount(downloadedBytes)
+                            val totalLabel = totalBytes?.let { formatByteCount(it) }
+                            customSourceStatus.value = if (totalLabel == null) {
+                                "Downloading ${selectedRef.refType} ${selectedRef.refName}... $downloadedLabel"
+                            } else {
+                                "Downloading ${selectedRef.refType} ${selectedRef.refName}... $downloadedLabel / $totalLabel"
+                            }
+                            customStatus.value = customSourceStatus.value
+                        }
+                    }
+                }
+
+                isDownloadingCustomSource.value = false
+                customSourceProgressPercent.value = null
+                busyOperation.value = BusyOperation.INSTALLING
+                customSourceStatus.value = "Download complete. Installing..."
+                customStatus.value = customSourceStatus.value
+
+                val result = withContext(Dispatchers.IO) {
+                    payload.installCustomFromZipFile(
+                        zipFile = zipFile,
+                        onProgress = { msg ->
+                            viewModelScope.launch(Dispatchers.Main) {
+                                customStatus.value = msg
+                            }
+                        },
+                        sourceInfo = NodePayload.CustomInstallInfo(
+                            repo = "$owner/$repo",
+                            refType = selectedRef.refType,
+                            refName = selectedRef.refName,
+                            commitSha = selectedRef.commitSha
+                        )
+                    )
+                }
+                refreshCustomInstallState()
+                val finalMessage = result.fold(
+                    onSuccess = {
+                        "Custom ST installed from ${selectedRef.refType}/${selectedRef.refName}."
+                    },
+                    onFailure = {
+                        "Installation failed: ${it.message ?: "unknown error"}"
+                    }
+                )
+                customStatus.value = finalMessage
+                customSourceStatus.value = finalMessage
+                appendServiceLog(finalMessage)
+            } catch (_: CancellationException) {
+                customSourceStatus.value = "Custom source download canceled."
+                customStatus.value = customSourceStatus.value
+            } catch (error: Exception) {
+                val detail = "custom-source-download: failed: ${error.message ?: "unknown error"}"
+                Log.w(TAG, detail)
+                appendServiceLog(detail)
+                customSourceStatus.value = "Custom source download failed."
+                customStatus.value = "Installation failed: ${error.message ?: "unknown error"}"
+            } finally {
+                if (zipFile.exists()) {
+                    zipFile.delete()
+                }
+                isDownloadingCustomSource.value = false
+                customSourceProgressPercent.value = null
+                busyOperation.value = null
+            }
+        }
+    }
+
+    fun cancelCustomSourceDownload() {
+        customSourceDownloadJob?.cancel()
     }
 
     fun removeUserData() {
@@ -501,6 +718,255 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun refreshCustomInstallState() {
+        isCustomInstalled.value = payload.isCustomInstalled()
+        customInstallLabel.value = payload.getCustomInstallLabel()
+    }
+
+    private data class SelectedCustomRef(
+        val refType: String,
+        val refTypePath: String,
+        val refName: String,
+        val commitSha: String?
+    )
+
+    private fun selectedCustomRef(): SelectedCustomRef? {
+        val selectedKey = selectedCustomRefKey.value ?: return null
+        val option = customAllRefs.value.firstOrNull { it.key == selectedKey }
+            ?: customFeaturedRefs.value.firstOrNull { it.key == selectedKey }
+            ?: return null
+        val type = when (option.refType) {
+            GithubRefType.BRANCH.storageValue -> GithubRefType.BRANCH
+            GithubRefType.TAG.storageValue -> GithubRefType.TAG
+            else -> return null
+        }
+        return SelectedCustomRef(
+            refType = option.refType,
+            refTypePath = type.archivePrefix,
+            refName = option.refName,
+            commitSha = option.commitSha
+        )
+    }
+
+    private fun parseGithubRepoInput(raw: String): Pair<String, String>? {
+        if (raw.isBlank()) return null
+        var normalized = raw.trim()
+            .removePrefix("https://")
+            .removePrefix("http://")
+        if (normalized.startsWith("github.com/", ignoreCase = true)) {
+            normalized = normalized.substringAfter('/')
+        }
+        normalized = normalized.removeSuffix("/").removeSuffix(".git")
+        val parts = normalized.split('/').filter { it.isNotBlank() }
+        if (parts.size < 2) return null
+        val owner = parts[0].trim()
+        val repo = parts[1].trim()
+        val segmentRegex = Regex("^[A-Za-z0-9._-]+$")
+        if (!segmentRegex.matches(owner) || !segmentRegex.matches(repo)) return null
+        return owner to repo
+    }
+
+    private fun fetchCustomRepoRefs(
+        owner: String,
+        repo: String
+    ): Pair<List<GithubRepoRef>, List<GithubRepoRef>> {
+        val defaultBranch = fetchRepoDefaultBranch(owner, repo)
+        val branches = fetchRepoBranches(owner, repo)
+        val tags = fetchRepoTags(owner, repo)
+        val releaseTags = fetchReleaseTagNames(owner, repo)
+
+        val sortedBranches = branches.sortedWith(
+            compareBy<GithubRepoRef> { branchSortRank(it.name, defaultBranch) }
+                .thenBy { it.name.lowercase() }
+        )
+        val sortedTags = tags.sortedWith { left, right ->
+            compareTagNamesForDisplay(left.name, right.name)
+        }
+        val all = buildList {
+            addAll(sortedBranches)
+            addAll(sortedTags)
+        }
+        val featured = pickFeaturedRefs(
+            defaultBranch = defaultBranch,
+            releaseTags = releaseTags,
+            allRefs = all
+        )
+        return featured to all
+    }
+
+    private fun fetchRepoDefaultBranch(owner: String, repo: String): String? {
+        val body = githubApiGet(
+            "https://api.github.com/repos/$owner/$repo"
+        )
+        return JSONObject(body).optString("default_branch", "").ifBlank { null }
+    }
+
+    private fun fetchRepoBranches(owner: String, repo: String): List<GithubRepoRef> {
+        val results = mutableListOf<GithubRepoRef>()
+        for (page in 1..MAX_GITHUB_PAGES) {
+            val body = githubApiGet(
+                "https://api.github.com/repos/$owner/$repo/branches?per_page=100&page=$page"
+            )
+            val entries = JSONArray(body)
+            if (entries.length() == 0) break
+            for (i in 0 until entries.length()) {
+                val item = entries.optJSONObject(i) ?: continue
+                val name = item.optString("name", "").trim()
+                if (name.isBlank()) continue
+                val sha = item.optJSONObject("commit")?.optString("sha", "")?.trim()?.ifBlank { null }
+                results += GithubRepoRef(
+                    type = GithubRefType.BRANCH,
+                    name = name,
+                    commitSha = sha
+                )
+            }
+            if (entries.length() < 100) break
+        }
+        return results
+    }
+
+    private fun fetchRepoTags(owner: String, repo: String): List<GithubRepoRef> {
+        val results = mutableListOf<GithubRepoRef>()
+        for (page in 1..MAX_GITHUB_PAGES) {
+            val body = githubApiGet(
+                "https://api.github.com/repos/$owner/$repo/tags?per_page=100&page=$page"
+            )
+            val entries = JSONArray(body)
+            if (entries.length() == 0) break
+            for (i in 0 until entries.length()) {
+                val item = entries.optJSONObject(i) ?: continue
+                val name = item.optString("name", "").trim()
+                if (name.isBlank()) continue
+                val sha = item.optJSONObject("commit")?.optString("sha", "")?.trim()?.ifBlank { null }
+                results += GithubRepoRef(
+                    type = GithubRefType.TAG,
+                    name = name,
+                    commitSha = sha
+                )
+            }
+            if (entries.length() < 100) break
+        }
+        return results
+    }
+
+    private fun fetchReleaseTagNames(owner: String, repo: String): List<String> {
+        val body = githubApiGet(
+            "https://api.github.com/repos/$owner/$repo/releases?per_page=10"
+        )
+        val entries = JSONArray(body)
+        val tags = mutableListOf<String>()
+        for (i in 0 until entries.length()) {
+            val item = entries.optJSONObject(i) ?: continue
+            if (item.optBoolean("draft", false)) continue
+            val tag = item.optString("tag_name", "").trim()
+            if (tag.isBlank()) continue
+            tags += tag
+        }
+        return tags
+    }
+
+    private fun pickFeaturedRefs(
+        defaultBranch: String?,
+        releaseTags: List<String>,
+        allRefs: List<GithubRepoRef>
+    ): List<GithubRepoRef> {
+        if (allRefs.isEmpty()) return emptyList()
+        val byKey = allRefs.associateBy { it.key }
+        val featured = mutableListOf<GithubRepoRef>()
+        fun add(type: GithubRefType, name: String?) {
+            val normalized = name?.trim().orEmpty()
+            if (normalized.isBlank()) return
+            val key = "${type.storageValue}:$normalized"
+            val found = byKey[key] ?: return
+            if (featured.none { it.key == found.key }) {
+                featured += found
+            }
+        }
+
+        add(GithubRefType.BRANCH, "staging")
+        add(GithubRefType.BRANCH, "release")
+        add(GithubRefType.BRANCH, defaultBranch)
+        for (tag in releaseTags.take(3)) {
+            add(GithubRefType.TAG, tag)
+        }
+        if (featured.size < MAX_FEATURED_REFS) {
+            add(GithubRefType.BRANCH, "main")
+            add(GithubRefType.BRANCH, "master")
+            add(GithubRefType.BRANCH, "develop")
+        }
+        if (featured.size < MAX_FEATURED_REFS) {
+            for (ref in allRefs) {
+                if (featured.none { it.key == ref.key }) {
+                    featured += ref
+                    if (featured.size >= MAX_FEATURED_REFS) break
+                }
+            }
+        }
+        return featured.take(MAX_FEATURED_REFS)
+    }
+
+    private fun branchSortRank(name: String, defaultBranch: String?): Int {
+        if (!defaultBranch.isNullOrBlank() && name == defaultBranch) return 2
+        return when (name) {
+            "staging" -> 0
+            "release" -> 1
+            "main" -> 3
+            "master" -> 4
+            "develop" -> 5
+            else -> 10
+        }
+    }
+
+    private fun GithubRepoRef.toUiOption(): CustomRepoRefOption {
+        val shortSha = commitSha?.take(7)
+        val shaLabel = if (shortSha.isNullOrBlank()) "" else " ($shortSha)"
+        return CustomRepoRefOption(
+            key = key,
+            label = "${type.storageValue}: $name$shaLabel",
+            refType = type.storageValue,
+            refName = name,
+            commitSha = commitSha
+        )
+    }
+
+    private fun compareTagNamesForDisplay(left: String, right: String): Int {
+        val leftParsed = parseVersion(left)
+        val rightParsed = parseVersion(right)
+        if (leftParsed != null && rightParsed != null) {
+            val semverCompare = compareVersions(rightParsed, leftParsed)
+            if (semverCompare != 0) return semverCompare
+        } else if (leftParsed != null) {
+            return -1
+        } else if (rightParsed != null) {
+            return 1
+        }
+        return naturalCompareAscending(right.lowercase(), left.lowercase())
+    }
+
+    private fun naturalCompareAscending(left: String, right: String): Int {
+        var i = 0
+        var j = 0
+        while (i < left.length && j < right.length) {
+            val lc = left[i]
+            val rc = right[j]
+            if (lc.isDigit() && rc.isDigit()) {
+                val iStart = i
+                val jStart = j
+                while (i < left.length && left[i].isDigit()) i++
+                while (j < right.length && right[j].isDigit()) j++
+                val leftNum = left.substring(iStart, i)
+                val rightNum = right.substring(jStart, j)
+                val cmp = compareNumericStrings(leftNum, rightNum)
+                if (cmp != 0) return cmp
+                continue
+            }
+            if (lc != rc) return lc.compareTo(rc)
+            i++
+            j++
+        }
+        return left.length.compareTo(right.length)
+    }
+
     private fun shouldRunAutoCheckNow(): Boolean {
         val now = System.currentTimeMillis()
         if (now < updateDismissedUntilMs.value) {
@@ -508,6 +974,81 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         val elapsed = now - lastAutoCheckMs.value
         return elapsed >= ONE_DAY_MS
+    }
+
+    private suspend fun downloadCustomSourceZip(
+        downloadUrl: String,
+        outputFile: File,
+        onProgress: suspend (Long, Long?) -> Unit
+    ) {
+        val tempFile = File(outputFile.parentFile, "${outputFile.name}.part")
+        if (tempFile.exists()) tempFile.delete()
+
+        val connection = (URL(downloadUrl).openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            connectTimeout = 20_000
+            readTimeout = 20_000
+            setRequestProperty("Accept", "application/octet-stream")
+            setRequestProperty("Accept-Encoding", "identity")
+            setRequestProperty("User-Agent", "st-android-custom-st")
+        }
+
+        try {
+            val status = connection.responseCode
+            if (status !in 200..299) {
+                val body = connection.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
+                val shortBody = body.replace('\n', ' ').take(240)
+                throw IllegalStateException("Download HTTP $status: $shortBody")
+            }
+
+            val totalBytes = sequenceOf(
+                connection.contentLengthLong,
+                connection.getHeaderFieldLong("X-Linked-Size", -1L),
+                connection.getHeaderFieldLong("x-goog-stored-content-length", -1L),
+                connection.getHeaderFieldLong("Content-Length", -1L)
+            ).firstOrNull { it > 0L }
+            var downloadedBytes = 0L
+            var lastProgress = -1
+            var lastReportedBytesBucket = -1L
+
+            connection.inputStream.use { input ->
+                tempFile.outputStream().use { output ->
+                    val buffer = ByteArray(DOWNLOAD_BUFFER_SIZE)
+                    while (true) {
+                        coroutineContext.ensureActive()
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        output.write(buffer, 0, read)
+                        downloadedBytes += read
+                        if (totalBytes != null) {
+                            val progress = ((downloadedBytes * 100L) / totalBytes).toInt().coerceIn(0, 100)
+                            if (progress != lastProgress) {
+                                lastProgress = progress
+                                onProgress(downloadedBytes, totalBytes)
+                            }
+                        } else {
+                            val bucket = downloadedBytes / (512L * 1024L)
+                            if (bucket != lastReportedBytesBucket) {
+                                lastReportedBytesBucket = bucket
+                                onProgress(downloadedBytes, null)
+                            }
+                        }
+                    }
+                }
+            }
+            if (totalBytes != null && lastProgress < 100) {
+                onProgress(totalBytes, totalBytes)
+            }
+
+            if (outputFile.exists()) outputFile.delete()
+            if (!tempFile.renameTo(outputFile)) {
+                tempFile.copyTo(outputFile, overwrite = true)
+                tempFile.delete()
+            }
+        } finally {
+            if (tempFile.exists()) tempFile.delete()
+            connection.disconnect()
+        }
     }
 
     private suspend fun downloadApk(
@@ -761,6 +1302,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return leftNorm.length.compareTo(rightNorm.length)
         }
         return leftNorm.compareTo(rightNorm)
+    }
+
+    private fun formatByteCount(bytes: Long): String {
+        if (bytes < 1024L) return "$bytes B"
+        val kb = bytes / 1024.0
+        if (kb < 1024.0) return String.format("%.1f KB", kb)
+        val mb = kb / 1024.0
+        if (mb < 1024.0) return String.format("%.1f MB", mb)
+        val gb = mb / 1024.0
+        return String.format("%.2f GB", gb)
     }
 
     private suspend fun appendServiceLog(message: String) {

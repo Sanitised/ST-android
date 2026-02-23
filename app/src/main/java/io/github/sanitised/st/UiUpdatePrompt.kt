@@ -180,3 +180,55 @@ fun NotificationPermissionCard(
         }
     }
 }
+
+@Composable
+fun CustomSourceDownloadCard(
+    visible: Boolean,
+    details: String,
+    downloadProgressPercent: Int?,
+    onCancelDownload: () -> Unit
+) {
+    if (!visible) return
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        ),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp)) {
+            Text(
+                text = "Downloading custom ST source",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            if (details.isNotBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = details,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            if (downloadProgressPercent == null) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            } else {
+                LinearProgressIndicator(
+                    progress = { downloadProgressPercent.coerceIn(0, 100) / 100f },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = "$downloadProgressPercent%",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            OutlinedButton(onClick = onCancelDownload) {
+                Text(text = "Cancel")
+            }
+        }
+    }
+}
