@@ -9,9 +9,9 @@ It is intended primarily for basic on-device chatting; advanced workflows (for e
 
 ## Privacy
 
-- The app makes no network requests beyond what SillyTavern itself does. Exception: loading a custom SillyTavern ZIP runs `npm install` to fetch its dependencies.
 - No telemetry of any kind.
 - Unlike Termux, app works in Private Space/Secure Folder/Secondary profiles.
+- Minimal network calls: opt-in Github release checks, npm installs for custom ST versions. All other traffic comes from SillyTavern itself.
 - All chats, characters, settings stay local unless you decide to export them manually and share with others.
 - Bundles SillyTavern source code without modifications.
 - Bundles Node.js with minimal patches required to run on Android.

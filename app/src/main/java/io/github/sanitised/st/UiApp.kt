@@ -54,9 +54,6 @@ fun STAndroidApp(
     onOpenNotificationSettings: () -> Unit,
     onEditConfig: () -> Unit,
     showNotificationPrompt: Boolean,
-    onExport: () -> Unit,
-    onImport: () -> Unit,
-    backupStatus: String,
     versionLabel: String,
     stLabel: String,
     nodeLabel: String,
@@ -74,8 +71,8 @@ fun STAndroidApp(
     onUpdatePrimary: () -> Unit,
     onUpdateDismiss: () -> Unit,
     onCancelUpdateDownload: () -> Unit,
-    onShowUpdateSettings: () -> Unit,
-    onShowAdvanced: () -> Unit
+    onShowSettings: () -> Unit,
+    onShowManageSt: () -> Unit
 ) {
     MaterialTheme {
         val isBusy = busyMessage.isNotBlank()
@@ -197,56 +194,12 @@ fun STAndroidApp(
                             Text(text = "Edit Config")
                         }
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        OutlinedButton(
-                            onClick = onExport,
-                            enabled = !isBusy && (status.state == NodeState.STOPPED || status.state == NodeState.ERROR),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(text = "Export Data")
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        OutlinedButton(
-                            onClick = onImport,
-                            enabled = !isBusy && (status.state == NodeState.STOPPED || status.state == NodeState.ERROR),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(text = "Import Data")
-                        }
-                    }
-                    if (backupStatus.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = backupStatus,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
                     if (showNotificationPrompt) {
                         Spacer(modifier = Modifier.height(16.dp))
-                        Card(
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text(
-                                    text = "Notification permission is required to keep the server " +
-                                        "running in the background. Only used for the foreground " +
-                                        "service notification.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Button(onClick = onOpenNotificationSettings) {
-                                    Text(text = "Notification Settings")
-                                }
-                            }
-                        }
+                        NotificationPermissionCard(
+                            visible = true,
+                            onOpenSettings = onOpenNotificationSettings
+                        )
                     }
                     if (showAutoCheckOptInPrompt) {
                         Spacer(modifier = Modifier.height(16.dp))
@@ -259,17 +212,17 @@ fun STAndroidApp(
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(modifier = Modifier.fillMaxWidth()) {
                         OutlinedButton(
-                            onClick = onShowUpdateSettings,
+                            onClick = onShowSettings,
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text(text = "Update Settings")
+                            Text(text = "Settings")
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         OutlinedButton(
-                            onClick = onShowAdvanced,
+                            onClick = onShowManageSt,
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text(text = "Advanced")
+                            Text(text = "Manage ST")
                         }
                     }
                     if (showUpdatePrompt) {
@@ -361,9 +314,6 @@ private fun STAndroidAppPreview() {
         onOpenNotificationSettings = {},
         onEditConfig = {},
         showNotificationPrompt = false,
-        onExport = {},
-        onImport = {},
-        backupStatus = "",
         versionLabel = "0.3.0-dev",
         stLabel = "SillyTavern 1.12.3",
         nodeLabel = "Node v24.13.0",
@@ -381,7 +331,7 @@ private fun STAndroidAppPreview() {
         onUpdatePrimary = {},
         onUpdateDismiss = {},
         onCancelUpdateDownload = {},
-        onShowUpdateSettings = {},
-        onShowAdvanced = {}
+        onShowSettings = {},
+        onShowManageSt = {}
     )
 }

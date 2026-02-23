@@ -44,12 +44,15 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun AdvancedScreen(
+fun ManageStScreen(
     onBack: () -> Unit,
     isCustomInstalled: Boolean,
     customStatus: String,
     serverRunning: Boolean,
     busyMessage: String,
+    onExport: () -> Unit,
+    onImport: () -> Unit,
+    backupStatus: String,
     onLoadCustomZip: () -> Unit,
     onResetToDefault: () -> Unit,
     onRemoveUserData: () -> Unit,
@@ -73,7 +76,7 @@ fun AdvancedScreen(
                 }
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "Advanced",
+                    text = "Manage ST",
                     style = MaterialTheme.typography.titleLarge
                 )
             }
@@ -88,6 +91,46 @@ fun AdvancedScreen(
                     .padding(horizontal = 20.dp, vertical = 20.dp)
             ) {
                 val buttonsEnabled = !serverRunning && busyMessage.isBlank()
+                Text(
+                    text = "Data Backup",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Export your current data or import a backup archive.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = onExport,
+                        enabled = buttonsEnabled,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(text = "Export Data")
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    OutlinedButton(
+                        onClick = onImport,
+                        enabled = buttonsEnabled,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(text = "Import Data")
+                    }
+                }
+                if (backupStatus.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = backupStatus,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = "User Data",
                     style = MaterialTheme.typography.titleSmall,
@@ -159,7 +202,7 @@ fun AdvancedScreen(
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         WarningBullet(
-                            text = "Back up your data first — use Export Data on the main screen.",
+                            text = "Back up your data first — use Export Data above.",
                             color = MaterialTheme.colorScheme.onErrorContainer
                         )
                         WarningBullet(
@@ -305,13 +348,16 @@ private fun InstructionStep(number: String, text: String, url: String? = null) {
 
 @Preview(showBackground = true)
 @Composable
-private fun AdvancedScreenPreview() {
-    AdvancedScreen(
+private fun ManageStScreenPreview() {
+    ManageStScreen(
         onBack = {},
         isCustomInstalled = true,
         customStatus = "Custom ST installed successfully.",
         serverRunning = false,
         busyMessage = "",
+        onExport = {},
+        onImport = {},
+        backupStatus = "",
         onLoadCustomZip = {},
         onResetToDefault = {},
         onRemoveUserData = {},

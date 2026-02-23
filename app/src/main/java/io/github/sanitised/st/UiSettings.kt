@@ -10,12 +10,14 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -23,12 +25,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun UpdateSettingsScreen(
+fun SettingsScreen(
     onBack: () -> Unit,
     autoCheckEnabled: Boolean,
     onAutoCheckChanged: (Boolean) -> Unit,
@@ -65,7 +68,7 @@ fun UpdateSettingsScreen(
                 }
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "Update Settings",
+                    text = "Settings",
                     style = MaterialTheme.typography.titleLarge
                 )
             }
@@ -126,36 +129,61 @@ fun UpdateSettingsScreen(
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    if (channel == UpdateChannel.RELEASE) {
-                        Button(
-                            onClick = {},
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(text = "Release")
-                        }
-                    } else {
-                        OutlinedButton(
-                            onClick = { onChannelChanged(UpdateChannel.RELEASE) },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(text = "Release")
+                Column(modifier = Modifier.fillMaxWidth().selectableGroup()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .selectable(
+                                selected = channel == UpdateChannel.RELEASE,
+                                onClick = { onChannelChanged(UpdateChannel.RELEASE) },
+                                role = Role.RadioButton
+                            )
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = channel == UpdateChannel.RELEASE,
+                            onClick = null
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = "Release",
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            Text(
+                                text = "Stable releases only",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    if (channel == UpdateChannel.PRERELEASE) {
-                        Button(
-                            onClick = {},
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(text = "Prerelease")
-                        }
-                    } else {
-                        OutlinedButton(
-                            onClick = { onChannelChanged(UpdateChannel.PRERELEASE) },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(text = "Prerelease")
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .selectable(
+                                selected = channel == UpdateChannel.PRERELEASE,
+                                onClick = { onChannelChanged(UpdateChannel.PRERELEASE) },
+                                role = Role.RadioButton
+                            )
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = channel == UpdateChannel.PRERELEASE,
+                            onClick = null
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = "Prerelease",
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            Text(
+                                text = "Includes beta/rc builds",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
@@ -182,8 +210,8 @@ fun UpdateSettingsScreen(
 
 @Preview(showBackground = true)
 @Composable
-private fun UpdateSettingsScreenPreview() {
-    UpdateSettingsScreen(
+private fun SettingsScreenPreview() {
+    SettingsScreen(
         onBack = {},
         autoCheckEnabled = false,
         onAutoCheckChanged = {},

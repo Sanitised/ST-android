@@ -85,8 +85,8 @@ class MainActivity : ComponentActivity() {
             val showConfigState = remember { mutableStateOf(false) }
             val showLegalState = remember { mutableStateOf(false) }
             val showLicenseState = remember { mutableStateOf<LegalDoc?>(null) }
-            val showUpdateSettingsState = remember { mutableStateOf(false) }
-            val showAdvancedState = remember { mutableStateOf(false) }
+            val showSettingsState = remember { mutableStateOf(false) }
+            val showManageStState = remember { mutableStateOf(false) }
             val stdoutState = remember { mutableStateOf("") }
             val stderrState = remember { mutableStateOf("") }
             val serviceState = remember { mutableStateOf("") }
@@ -191,6 +191,23 @@ class MainActivity : ComponentActivity() {
                 if (uri == null) return@rememberLauncherForActivityResult
                 viewModel.installCustomZip(uri)
             }
+            val triggerExport: () -> Unit = {
+                val stamp = LocalDateTime.now()
+                    .format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
+                exportLauncher.launch("sillytavern-backup-$stamp.tar.gz")
+            }
+            val triggerImport: () -> Unit = {
+                importLauncher.launch(
+                    arrayOf(
+                        "application/zip",
+                        "application/x-zip-compressed",
+                        "application/gzip",
+                        "application/x-gzip",
+                        "application/octet-stream",
+                        "application/x-tar"
+                    )
+                )
+            }
 
             // Screen routing
             when {
@@ -229,10 +246,10 @@ class MainActivity : ComponentActivity() {
                         configFile = AppPaths(this).configFile
                     )
                 }
-                showUpdateSettingsState.value -> {
-                    BackHandler { showUpdateSettingsState.value = false }
-                    UpdateSettingsScreen(
-                        onBack = { showUpdateSettingsState.value = false },
+                showSettingsState.value -> {
+                    BackHandler { showSettingsState.value = false }
+                    SettingsScreen(
+                        onBack = { showSettingsState.value = false },
                         autoCheckEnabled = viewModel.autoCheckForUpdates.value,
                         onAutoCheckChanged = { enabled -> viewModel.setAutoCheckForUpdates(enabled) },
                         channel = viewModel.updateChannel.value,
@@ -257,15 +274,18 @@ class MainActivity : ComponentActivity() {
                         onCancelUpdateDownload = { viewModel.cancelUpdateDownload() }
                     )
                 }
-                showAdvancedState.value -> {
-                    BackHandler { showAdvancedState.value = false }
-                    AdvancedScreen(
-                        onBack = { showAdvancedState.value = false },
+                showManageStState.value -> {
+                    BackHandler { showManageStState.value = false }
+                    ManageStScreen(
+                        onBack = { showManageStState.value = false },
                         isCustomInstalled = viewModel.isCustomInstalled.value,
                         customStatus = viewModel.customStatus.value,
                         serverRunning = statusState.value.state == NodeState.RUNNING ||
                             statusState.value.state == NodeState.STARTING,
                         busyMessage = viewModel.busyMessage,
+                        onExport = triggerExport,
+                        onImport = triggerImport,
+                        backupStatus = viewModel.backupStatus.value,
                         onLoadCustomZip = {
                             customZipLauncher.launch(
                                 arrayOf(
@@ -291,24 +311,6 @@ class MainActivity : ComponentActivity() {
                         onOpenNotificationSettings = { openNotificationSettings() },
                         onEditConfig = { showConfigState.value = true },
                         showNotificationPrompt = !notificationGrantedState.value,
-                        onExport = {
-                            val stamp = LocalDateTime.now()
-                                .format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
-                            exportLauncher.launch("sillytavern-backup-$stamp.tar.gz")
-                        },
-                        onImport = {
-                            importLauncher.launch(
-                                arrayOf(
-                                    "application/zip",
-                                    "application/x-zip-compressed",
-                                    "application/gzip",
-                                    "application/x-gzip",
-                                    "application/octet-stream",
-                                    "application/x-tar"
-                                )
-                            )
-                        },
-                        backupStatus = viewModel.backupStatus.value,
                         versionLabel = versionLabel,
                         stLabel = if (viewModel.isCustomInstalled.value) "SillyTavern (custom version)" else stLabel,
                         nodeLabel = nodeLabel,
@@ -332,8 +334,8 @@ class MainActivity : ComponentActivity() {
                         },
                         onUpdateDismiss = { viewModel.dismissAvailableUpdatePrompt() },
                         onCancelUpdateDownload = { viewModel.cancelUpdateDownload() },
-                        onShowUpdateSettings = { showUpdateSettingsState.value = true },
-                        onShowAdvanced = { showAdvancedState.value = true }
+                        onShowSettings = { showSettingsState.value = true },
+                        onShowManageSt = { showManageStState.value = true }
                     )
                 }
             }
