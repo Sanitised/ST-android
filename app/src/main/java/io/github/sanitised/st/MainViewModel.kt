@@ -92,7 +92,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         updatePrefs.getBoolean(PREF_AUTO_CHECK, false)
     )
     val updateChannel = mutableStateOf(
-        UpdateChannel.fromStorage(updatePrefs.getString(PREF_CHANNEL, UpdateChannel.RELEASE.storageValue))
+        resolveInitialUpdateChannel()
     )
     private val firstLaunchMs = ensureFirstLaunchTimestamp()
     private val autoOptInPromptShown = mutableStateOf(
@@ -470,6 +470,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val now = System.currentTimeMillis()
         updatePrefs.edit().putLong(PREF_FIRST_LAUNCH_MS, now).apply()
         return now
+    }
+
+    private fun resolveInitialUpdateChannel(): UpdateChannel {
+        val storedValue = updatePrefs.getString(PREF_CHANNEL, null)
+        if (storedValue != null) {
+            return UpdateChannel.fromStorage(storedValue)
+        }
+
+        val inferred = inferChannelFromCurrentVersion(getCurrentVersionName())
+        updatePrefs.edit().putString(PREF_CHANNEL, inferred.storageValue).apply()
+        return inferred
+    }
+
+    private fun inferChannelFromCurrentVersion(versionName: String): UpdateChannel {
+        val parsed = parseVersion(versionName)
+        if (parsed != null) {
+            return if (parsed.preRelease.isEmpty()) {
+                UpdateChannel.RELEASE
+            } else {
+                UpdateChannel.PRERELEASE
+            }
+        }
+
+        val normalized = normalizeVersion(versionName).substringBefore('+')
+        return if (normalized.contains('-')) {
+            UpdateChannel.PRERELEASE
+        } else {
+            UpdateChannel.RELEASE
+        }
     }
 
     private fun shouldRunAutoCheckNow(): Boolean {
