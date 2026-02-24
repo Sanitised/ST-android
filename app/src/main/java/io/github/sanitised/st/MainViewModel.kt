@@ -129,7 +129,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         updatePrefs.getBoolean(PREF_AUTO_CHECK, false)
     )
     val autoOpenBrowserWhenReady = mutableStateOf(
-        updatePrefs.getBoolean(PREF_AUTO_OPEN_BROWSER, false)
+        updatePrefs.getBoolean(PREF_AUTO_OPEN_BROWSER, true)
     )
     val updateChannel = mutableStateOf(
         resolveInitialUpdateChannel()
