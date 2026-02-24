@@ -967,7 +967,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val defaultBranch = fetchRepoDefaultBranch(owner, repo)
         val branches = fetchRepoBranches(owner, repo)
         val tags = fetchRepoTags(owner, repo)
-        val releaseTags = fetchReleaseTagNames(owner, repo)
 
         val sortedBranches = branches.sortedWith(
             compareBy<GithubRepoRef> { branchSortRank(it.name, defaultBranch) }
@@ -982,7 +981,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         val featured = pickFeaturedRefs(
             defaultBranch = defaultBranch,
-            releaseTags = releaseTags,
+            tagNames = sortedTags.map { it.name },
             allRefs = all
         )
         return featured to all
@@ -1043,25 +1042,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return results
     }
 
-    private fun fetchReleaseTagNames(owner: String, repo: String): List<String> {
-        val body = githubApiGet(
-            "https://api.github.com/repos/$owner/$repo/releases?per_page=10"
-        )
-        val entries = JSONArray(body)
-        val tags = mutableListOf<String>()
-        for (i in 0 until entries.length()) {
-            val item = entries.optJSONObject(i) ?: continue
-            if (item.optBoolean("draft", false)) continue
-            val tag = item.optString("tag_name", "").trim()
-            if (tag.isBlank()) continue
-            tags += tag
-        }
-        return tags
-    }
-
     private fun pickFeaturedRefs(
         defaultBranch: String?,
-        releaseTags: List<String>,
+        tagNames: List<String>,
         allRefs: List<GithubRepoRef>
     ): List<GithubRepoRef> {
         if (allRefs.isEmpty()) return emptyList()
@@ -1080,7 +1063,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         add(GithubRefType.BRANCH, "staging")
         add(GithubRefType.BRANCH, "release")
         add(GithubRefType.BRANCH, defaultBranch)
-        for (tag in releaseTags.take(3)) {
+        for (tag in tagNames.take(3)) {
             add(GithubRefType.TAG, tag)
         }
         if (featured.size < MAX_FEATURED_REFS) {
