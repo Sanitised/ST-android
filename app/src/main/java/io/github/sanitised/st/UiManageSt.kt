@@ -391,14 +391,7 @@ fun ManageStScreen(
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold
                     )
-                    if (serverRunning) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Stop the server before making changes.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    } else if (busyMessage.isNotBlank()) {
+                    if (busyMessage.isNotBlank()) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "$busyMessage — please wait.",

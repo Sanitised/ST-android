@@ -244,7 +244,6 @@ class MainActivity : ComponentActivity() {
                     )
                 }
                 showConfigState.value -> {
-                    BackHandler { showConfigState.value = false }
                     ConfigScreen(
                         onBack = { showConfigState.value = false },
                         onOpenDocs = { openConfigDocs() },

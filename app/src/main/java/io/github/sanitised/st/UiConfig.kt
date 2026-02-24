@@ -1,5 +1,6 @@
 package io.github.sanitised.st
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -59,6 +60,14 @@ fun ConfigScreen(
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
+    val requestBack = {
+        val canEditEffective = canEdit && !missingState.value
+        if (canEditEffective && textState.value.text != originalState.value) {
+            showDiscardDialog.value = true
+        } else {
+            onBack()
+        }
+    }
 
     LaunchedEffect(Unit) {
         val content = withContext(Dispatchers.IO) {
@@ -78,6 +87,7 @@ fun ConfigScreen(
             keyboardController?.show()
         }
     }
+    BackHandler(onBack = requestBack)
 
     Surface(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -93,14 +103,7 @@ fun ConfigScreen(
                     .padding(start = 4.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(onClick = {
-                    val canEditEffective = canEdit && !missingState.value
-                    if (canEditEffective && textState.value.text != originalState.value) {
-                        showDiscardDialog.value = true
-                    } else {
-                        onBack()
-                    }
-                }) {
+                TextButton(onClick = requestBack) {
                     Text(text = "← Back")
                 }
                 Spacer(modifier = Modifier.width(4.dp))
@@ -110,7 +113,7 @@ fun ConfigScreen(
                     modifier = Modifier.weight(1f)
                 )
                 TextButton(onClick = onOpenDocs) {
-                    Text(text = "Docs →")
+                    Text(text = "Docs")
                 }
             }
             HorizontalDivider()
@@ -182,7 +185,8 @@ fun ConfigScreen(
                                     originalState.value = textState.value.text
                                     statusState.value = "Saved"
                                 } else {
-                                    statusState.value = "Save failed: ${result.exceptionOrNull()?.message ?: "unknown error"}"
+                                    statusState.value =
+                                        "Save failed: ${result.exceptionOrNull()?.message ?: "unknown error"}"
                                 }
                             }
                         }
