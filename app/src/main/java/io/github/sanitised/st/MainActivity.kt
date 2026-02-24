@@ -87,6 +87,7 @@ class MainActivity : ComponentActivity() {
             val showLicenseState = remember { mutableStateOf<LegalDoc?>(null) }
             val showSettingsState = remember { mutableStateOf(false) }
             val showManageStState = remember { mutableStateOf(false) }
+            val autoOpenBrowserTriggeredForCurrentRun = remember { mutableStateOf(false) }
             val stdoutState = remember { mutableStateOf("") }
             val stderrState = remember { mutableStateOf("") }
             val serviceState = remember { mutableStateOf("") }
@@ -143,6 +144,11 @@ class MainActivity : ComponentActivity() {
             }
             LaunchedEffect(Unit) {
                 viewModel.maybeAutoCheckForUpdates()
+            }
+            LaunchedEffect(statusState.value.state) {
+                if (statusState.value.state != NodeState.RUNNING) {
+                    autoOpenBrowserTriggeredForCurrentRun.value = false
+                }
             }
             val showAutoCheckOptInPrompt = viewModel.shouldShowAutoCheckOptInPrompt()
             val showUpdatePrompt = viewModel.shouldShowUpdatePrompt()
@@ -325,6 +331,8 @@ class MainActivity : ComponentActivity() {
                         onStop = { stopNode() },
                         onOpen = { openNodeUi(statusState.value.port) },
                         autoOpenBrowserWhenReady = viewModel.autoOpenBrowserWhenReady.value,
+                        autoOpenBrowserTriggeredForCurrentRun = autoOpenBrowserTriggeredForCurrentRun.value,
+                        onAutoOpenBrowserTriggered = { autoOpenBrowserTriggeredForCurrentRun.value = true },
                         onShowLogs = { showLogsState.value = true },
                         onOpenNotificationSettings = { openNotificationSettings() },
                         onEditConfig = { showConfigState.value = true },

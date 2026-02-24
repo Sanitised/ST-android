@@ -51,6 +51,8 @@ fun STAndroidApp(
     onStop: () -> Unit,
     onOpen: () -> Unit,
     autoOpenBrowserWhenReady: Boolean,
+    autoOpenBrowserTriggeredForCurrentRun: Boolean,
+    onAutoOpenBrowserTriggered: () -> Unit,
     onShowLogs: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
     onEditConfig: () -> Unit,
@@ -113,8 +115,9 @@ fun STAndroidApp(
         val canOpen = status.state == NodeState.RUNNING && readyState.value
         LaunchedEffect(canOpen, autoOpenBrowserWhenReady) {
             val justBecameActive = canOpen && !wasCanOpen.value
-            if (autoOpenBrowserWhenReady && justBecameActive) {
+            if (autoOpenBrowserWhenReady && justBecameActive && !autoOpenBrowserTriggeredForCurrentRun) {
                 onOpen()
+                onAutoOpenBrowserTriggered()
             }
             wasCanOpen.value = canOpen
         }
@@ -333,6 +336,8 @@ private fun STAndroidAppPreview() {
         onStop = {},
         onOpen = {},
         autoOpenBrowserWhenReady = false,
+        autoOpenBrowserTriggeredForCurrentRun = false,
+        onAutoOpenBrowserTriggered = {},
         onShowLogs = {},
         onOpenNotificationSettings = {},
         onEditConfig = {},
