@@ -1,6 +1,5 @@
 package io.github.sanitised.st
 
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -27,11 +26,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -151,23 +145,6 @@ private fun CopyButton(text: String) {
         Text(text = "Copy", style = MaterialTheme.typography.labelMedium)
     }
 }
-
-private fun Modifier.verticalScrollbar(state: ScrollState, color: Color): Modifier =
-    drawWithContent {
-        drawContent()
-        if (state.maxValue > 0 && state.maxValue < Int.MAX_VALUE) {
-            val viewport = size.height
-            val content = viewport + state.maxValue
-            val thumbH = (viewport * viewport / content).coerceAtLeast(48f)
-            val thumbY = (state.value.toFloat() / state.maxValue) * (viewport - thumbH)
-            drawRoundRect(
-                color = color,
-                topLeft = Offset(size.width - 8f, thumbY + 2f),
-                size = Size(6f, thumbH - 4f),
-                cornerRadius = CornerRadius(3f)
-            )
-        }
-    }
 
 suspend fun readLogTail(file: File, maxBytes: Int): String {
     return withContext(Dispatchers.IO) {

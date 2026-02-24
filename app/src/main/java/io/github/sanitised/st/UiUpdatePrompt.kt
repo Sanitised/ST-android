@@ -166,7 +166,7 @@ fun NotificationPermissionCard(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Allow notifications so SillyTavern server can keep running in the backgroundn. This permission is not used for anything else.",
+                text = "Allow notifications so SillyTavern server can keep running in the background. This permission is not used for anything else.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSecondaryContainer
             )

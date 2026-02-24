@@ -1264,6 +1264,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val totalBytes = connection.contentLengthLong.takeIf { it > 0L }
             var downloadedBytes = 0L
             var lastProgress = -1
+            var lastReportedBytesBucket = -1L
 
             connection.inputStream.use { input ->
                 tempFile.outputStream().use { output ->
@@ -1281,7 +1282,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 onProgress(progress)
                             }
                         } else {
-                            onProgress(null)
+                            val bucket = downloadedBytes / (512L * 1024L)
+                            if (bucket != lastReportedBytesBucket) {
+                                lastReportedBytesBucket = bucket
+                                onProgress(null)
+                            }
                         }
                     }
                 }
