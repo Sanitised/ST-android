@@ -74,6 +74,10 @@ fun STAndroidApp(
     onUpdatePrimary: () -> Unit,
     onUpdateDismiss: () -> Unit,
     onCancelUpdateDownload: () -> Unit,
+    showBackupOperationCard: Boolean,
+    backupOperationTitle: String,
+    backupOperationDetails: String,
+    backupOperationProgressPercent: Int?,
     showCustomOperationCard: Boolean,
     customOperationTitle: String,
     customOperationDetails: String,
@@ -258,6 +262,17 @@ fun STAndroidApp(
                             onCancelDownload = onCancelUpdateDownload
                         )
                     }
+                    if (showBackupOperationCard) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        CustomSourceDownloadCard(
+                            visible = true,
+                            title = backupOperationTitle,
+                            details = backupOperationDetails,
+                            downloadProgressPercent = backupOperationProgressPercent,
+                            showCancel = false,
+                            onCancelDownload = {}
+                        )
+                    }
                     if (showCustomOperationCard) {
                         Spacer(modifier = Modifier.height(16.dp))
                         CustomSourceDownloadCard(
@@ -363,6 +378,10 @@ private fun STAndroidAppPreview() {
         onUpdatePrimary = {},
         onUpdateDismiss = {},
         onCancelUpdateDownload = {},
+        showBackupOperationCard = false,
+        backupOperationTitle = "",
+        backupOperationDetails = "",
+        backupOperationProgressPercent = null,
         showCustomOperationCard = false,
         customOperationTitle = "",
         customOperationDetails = "",

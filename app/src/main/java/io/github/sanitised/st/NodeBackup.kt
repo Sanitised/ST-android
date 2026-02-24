@@ -17,7 +17,16 @@ import java.util.zip.ZipInputStream
 object NodeBackup {
     private const val BACKUP_ROOT = "st_backup"
 
-    fun exportToUri(context: Context, uri: Uri): Result<String> {
+    data class BackupProgress(
+        val message: String,
+        val percent: Int?
+    )
+
+    fun exportToUri(
+        context: Context,
+        uri: Uri,
+        onProgress: (BackupProgress) -> Unit = {}
+    ): Result<String> {
         return runCatching {
             val paths = AppPaths(context)
             val configFile = paths.configFile
@@ -27,26 +36,60 @@ object NodeBackup {
             if (!hasConfig && !hasData) {
                 throw IllegalStateException("Nothing to export")
             }
+            val totalBytes = (if (hasConfig) configFile.length() else 0L) +
+                (if (hasData) totalRegularFileBytes(dataDir) else 0L)
+            var copiedBytes = 0L
+            var lastPercent = -1
+            fun report(message: String, force: Boolean = false) {
+                val percent = if (totalBytes > 0L) {
+                    ((copiedBytes.coerceAtMost(totalBytes) * 100L) / totalBytes).toInt().coerceIn(0, 100)
+                } else {
+                    null
+                }
+                if (!force && percent != null && percent == lastPercent) return
+                if (percent != null) {
+                    lastPercent = percent
+                }
+                onProgress(BackupProgress(message = message, percent = percent))
+            }
+
+            report("Preparing export…", force = true)
             context.contentResolver.openOutputStream(uri)?.use { output ->
                 BufferedOutputStream(output).use { buffered ->
                     GZIPOutputStream(buffered).use { gz ->
                         writeTarDirectory(gz, "$BACKUP_ROOT/")
                         if (hasConfig) {
-                            writeTarFile(gz, "$BACKUP_ROOT/config.yaml", configFile)
+                            writeTarFile(
+                                output = gz,
+                                name = "$BACKUP_ROOT/config.yaml",
+                                file = configFile
+                            ) { copied ->
+                                copiedBytes += copied
+                                report("Exporting backup…")
+                            }
                         }
                         if (dataDir.exists()) {
                             writeTarDirectory(gz, "$BACKUP_ROOT/data/")
-                            writeTarTree(gz, dataDir, "$BACKUP_ROOT/data")
+                            writeTarTree(gz, dataDir, "$BACKUP_ROOT/data") { copied ->
+                                copiedBytes += copied
+                                report("Exporting backup…")
+                            }
                         }
                         finishTar(gz)
                     }
                 }
             } ?: throw IllegalStateException("Unable to open destination")
+            copiedBytes = totalBytes
+            report("Export completed", force = true)
             "Export completed"
         }
     }
 
-    fun importFromUri(context: Context, uri: Uri): Result<String> {
+    fun importFromUri(
+        context: Context,
+        uri: Uri,
+        onProgress: (BackupProgress) -> Unit = {}
+    ): Result<String> {
         return runCatching {
             val paths = AppPaths(context)
             val tmpRoot = paths.tmpDir
@@ -55,23 +98,53 @@ object NodeBackup {
                 importDir.deleteRecursively()
             }
             importDir.mkdirs()
+            val totalBytes = runCatching {
+                context.contentResolver.openAssetFileDescriptor(uri, "r")?.use { afd ->
+                    afd.length.takeIf { it > 0L }
+                }
+            }.getOrNull()
+            onProgress(BackupProgress("Preparing import…", null))
 
             context.contentResolver.openInputStream(uri)?.use { raw ->
-                val pushback = PushbackInputStream(BufferedInputStream(raw), 2)
+                val countingRaw = CountingInputStream(BufferedInputStream(raw))
+                val pushback = PushbackInputStream(countingRaw, 2)
+                var lastPercent = -1
+                var lastMessage = ""
+                fun reportExtractProgress(message: String, force: Boolean) {
+                    val percent = totalBytes?.let { total ->
+                        ((countingRaw.bytesRead.coerceAtMost(total) * 100L) / total).toInt().coerceIn(0, 100)
+                    }
+                    if (!force && message == lastMessage && percent == lastPercent) {
+                        return
+                    }
+                    lastMessage = message
+                    if (percent != null) {
+                        lastPercent = percent
+                    }
+                    onProgress(BackupProgress(message, percent))
+                }
                 val sig = ByteArray(2)
                 val read = pushback.read(sig)
                 if (read > 0) pushback.unread(sig, 0, read)
+                reportExtractProgress("Extracting backup…", true)
                 when {
                     read == 2 && sig[0] == 0x50.toByte() && sig[1] == 0x4B.toByte() ->
-                        extractBackupFromZip(pushback, importDir)
+                        extractBackupFromZip(pushback, importDir) {
+                            reportExtractProgress("Extracting backup…", false)
+                        }
 
                     read == 2 && sig[0] == 0x1F.toByte() && sig[1] == 0x8B.toByte() ->
-                        extractBackup(GZIPInputStream(pushback), importDir)
+                        extractBackup(GZIPInputStream(pushback), importDir) {
+                            reportExtractProgress("Extracting backup…", false)
+                        }
 
                     else ->
-                        extractBackup(pushback, importDir)
+                        extractBackup(pushback, importDir) {
+                            reportExtractProgress("Extracting backup…", false)
+                        }
                 }
             } ?: throw IllegalStateException("Unable to open archive")
+            onProgress(BackupProgress("Applying backup…", null))
 
             val configSrc = File(importDir, "config/config.yaml")
             val dataSrc = File(importDir, "data")
@@ -122,11 +195,16 @@ object NodeBackup {
             }
 
             importDir.deleteRecursively()
+            onProgress(BackupProgress("Import complete", 100))
             "Import complete"
         }
     }
 
-    private fun extractBackupFromZip(input: InputStream, destDir: File) {
+    private fun extractBackupFromZip(
+        input: InputStream,
+        destDir: File,
+        onProgressTick: () -> Unit = {}
+    ) {
         try {
             ZipInputStream(input).use { zis ->
                 var entry = zis.nextEntry
@@ -142,6 +220,7 @@ object NodeBackup {
                             }
                         }
                     }
+                    onProgressTick()
                     zis.closeEntry()
                     entry = zis.nextEntry
                 }
@@ -151,7 +230,11 @@ object NodeBackup {
         }
     }
 
-    private fun extractBackup(input: InputStream, destDir: File) {
+    private fun extractBackup(
+        input: InputStream,
+        destDir: File,
+        onProgressTick: () -> Unit = {}
+    ) {
         BufferedInputStream(input).use { stream ->
             val header = ByteArray(512)
             var pendingLongName: String? = null
@@ -202,6 +285,7 @@ object NodeBackup {
                 if (padding > 0) {
                     TarUtils.skipFully(stream, padding)
                 }
+                onProgressTick()
             }
         }
     }
@@ -224,15 +308,20 @@ object NodeBackup {
         return TarUtils.safeResolve(destDir, normalized)
     }
 
-    private fun writeTarTree(output: OutputStream, root: File, baseName: String) {
+    private fun writeTarTree(
+        output: OutputStream,
+        root: File,
+        baseName: String,
+        onBytesCopied: (Long) -> Unit = {}
+    ) {
         val entries = root.listFiles() ?: return
         for (entry in entries) {
             val name = "$baseName/${entry.name}"
             if (entry.isDirectory) {
                 writeTarDirectory(output, "$name/")
-                writeTarTree(output, entry, name)
+                writeTarTree(output, entry, name, onBytesCopied)
             } else {
-                writeTarFile(output, name, entry)
+                writeTarFile(output, name, entry, onBytesCopied)
             }
         }
     }
@@ -242,11 +331,22 @@ object NodeBackup {
         writeTarHeader(output, normalized, 0, 493, '5')
     }
 
-    private fun writeTarFile(output: OutputStream, name: String, file: File) {
+    private fun writeTarFile(
+        output: OutputStream,
+        name: String,
+        file: File,
+        onBytesCopied: (Long) -> Unit = {}
+    ) {
         val size = file.length()
         writeTarHeader(output, name, size, 420, '0')
         file.inputStream().use { input ->
-            input.copyTo(output)
+            val buffer = ByteArray(16 * 1024)
+            while (true) {
+                val read = input.read(buffer)
+                if (read <= 0) break
+                output.write(buffer, 0, read)
+                onBytesCopied(read.toLong())
+            }
         }
         val padding = (512 - (size % 512)) % 512
         if (padding > 0) {
@@ -320,6 +420,44 @@ object NodeBackup {
             header[offset + length - 1] = 0
         } else {
             header[offset + length - 1] = 0x20
+        }
+    }
+
+    private fun totalRegularFileBytes(root: File): Long {
+        if (!root.exists()) return 0L
+        if (root.isFile) return root.length()
+        val children = root.listFiles() ?: return 0L
+        var total = 0L
+        for (child in children) {
+            total += totalRegularFileBytes(child)
+        }
+        return total
+    }
+
+    private class CountingInputStream(
+        private val delegate: InputStream
+    ) : InputStream() {
+        var bytesRead: Long = 0L
+            private set
+
+        override fun read(): Int {
+            val result = delegate.read()
+            if (result >= 0) {
+                bytesRead += 1
+            }
+            return result
+        }
+
+        override fun read(buffer: ByteArray, off: Int, len: Int): Int {
+            val result = delegate.read(buffer, off, len)
+            if (result > 0) {
+                bytesRead += result.toLong()
+            }
+            return result
+        }
+
+        override fun close() {
+            delegate.close()
         }
     }
 

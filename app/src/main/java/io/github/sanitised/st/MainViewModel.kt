@@ -37,6 +37,11 @@ enum class CustomOperationAnchor {
     RESET_TO_BUNDLED
 }
 
+enum class BackupOperationAnchor {
+    EXPORT,
+    IMPORT
+}
+
 enum class UpdateChannel(val storageValue: String) {
     RELEASE("release"),
     PRERELEASE("prerelease");
@@ -136,6 +141,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val customOperationCardProgressPercent = mutableStateOf<Int?>(null)
     val customOperationCardCancelable = mutableStateOf(false)
     val customOperationCardAnchor = mutableStateOf(CustomOperationAnchor.GITHUB_INSTALL)
+    val backupOperationCardVisible = mutableStateOf(false)
+    val backupOperationCardTitle = mutableStateOf("")
+    val backupOperationCardDetails = mutableStateOf("")
+    val backupOperationCardProgressPercent = mutableStateOf<Int?>(null)
+    val backupOperationCardAnchor = mutableStateOf(BackupOperationAnchor.EXPORT)
     val autoCheckForUpdates = mutableStateOf(
         updatePrefs.getBoolean(PREF_AUTO_CHECK, false)
     )
@@ -169,6 +179,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var updateDownloadJob: Job? = null
     private var customSourceDownloadJob: Job? = null
     private var customOperationCardToken = 0L
+    private var backupOperationCardToken = 0L
 
     // Updated by MainActivity when the service connection changes.
     var nodeService: NodeService? = null
@@ -192,23 +203,49 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun export(uri: Uri) {
         busyOperation.value = BusyOperation.EXPORTING
+        startBackupOperationCard(
+            title = "Exporting Backup",
+            details = "Preparing export…",
+            progressPercent = null,
+            anchor = BackupOperationAnchor.EXPORT
+        )
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
-                NodeBackup.exportToUri(getApplication(), uri)
+                NodeBackup.exportToUri(getApplication(), uri) { progress ->
+                    viewModelScope.launch(Dispatchers.Main) {
+                        updateBackupOperationCard(
+                            details = progress.message,
+                            progressPercent = progress.percent
+                        )
+                    }
+                }
             }
             val msg = result.getOrElse { "Export failed: ${it.message ?: "unknown error"}" }
             busyOperation.value = null
-            postUserMessage(msg)
+            finishBackupOperationCard(msg)
             appendServiceLog(msg)
         }
     }
 
     fun import(uri: Uri) {
         busyOperation.value = BusyOperation.IMPORTING
+        startBackupOperationCard(
+            title = "Importing Backup",
+            details = "Preparing import…",
+            progressPercent = null,
+            anchor = BackupOperationAnchor.IMPORT
+        )
         val service = nodeService
         viewModelScope.launch {
             val importResult = withContext(Dispatchers.IO) {
-                NodeBackup.importFromUri(getApplication(), uri)
+                NodeBackup.importFromUri(getApplication(), uri) { progress ->
+                    viewModelScope.launch(Dispatchers.Main) {
+                        updateBackupOperationCard(
+                            details = progress.message,
+                            progressPercent = progress.percent
+                        )
+                    }
+                }
             }
             val postInstallResult = if (importResult.isSuccess) {
                 withContext(Dispatchers.IO) {
@@ -225,7 +262,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 else -> "Import complete"
             }
             busyOperation.value = null
-            postUserMessage(msg)
+            finishBackupOperationCard(msg)
             appendServiceLog(msg)
         }
     }
@@ -881,6 +918,44 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 customOperationCardVisible.value = false
                 customOperationCardTitle.value = ""
                 customOperationCardDetails.value = ""
+            }
+        }
+    }
+
+    private fun startBackupOperationCard(
+        title: String,
+        details: String,
+        progressPercent: Int?,
+        anchor: BackupOperationAnchor
+    ) {
+        backupOperationCardToken += 1
+        backupOperationCardVisible.value = true
+        backupOperationCardTitle.value = title
+        backupOperationCardDetails.value = details
+        backupOperationCardProgressPercent.value = progressPercent
+        backupOperationCardAnchor.value = anchor
+    }
+
+    private fun updateBackupOperationCard(
+        details: String? = null,
+        progressPercent: Int? = backupOperationCardProgressPercent.value
+    ) {
+        if (details != null) {
+            backupOperationCardDetails.value = details
+        }
+        backupOperationCardProgressPercent.value = progressPercent
+    }
+
+    private fun finishBackupOperationCard(finalMessage: String) {
+        val token = backupOperationCardToken
+        backupOperationCardDetails.value = finalMessage
+        backupOperationCardProgressPercent.value = null
+        viewModelScope.launch {
+            delay(1500)
+            if (token == backupOperationCardToken) {
+                backupOperationCardVisible.value = false
+                backupOperationCardTitle.value = ""
+                backupOperationCardDetails.value = ""
             }
         }
     }

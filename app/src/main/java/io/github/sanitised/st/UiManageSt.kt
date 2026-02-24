@@ -68,6 +68,11 @@ fun ManageStScreen(
     onSelectRepoRef: (String) -> Unit,
     onDownloadAndInstallRef: () -> Unit,
     customInstallValidationMessage: String,
+    showBackupOperationCard: Boolean,
+    backupOperationTitle: String,
+    backupOperationDetails: String,
+    backupOperationProgressPercent: Int?,
+    backupOperationAnchor: BackupOperationAnchor,
     showCustomOperationCard: Boolean,
     customOperationTitle: String,
     customOperationDetails: String,
@@ -146,6 +151,20 @@ fun ManageStScreen(
                         ) {
                             Text(text = "Import Data")
                         }
+                    }
+                    if (showBackupOperationCard &&
+                        (backupOperationAnchor == BackupOperationAnchor.EXPORT ||
+                            backupOperationAnchor == BackupOperationAnchor.IMPORT)
+                    ) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        CustomSourceDownloadCard(
+                            visible = true,
+                            title = backupOperationTitle,
+                            details = backupOperationDetails,
+                            downloadProgressPercent = backupOperationProgressPercent,
+                            showCancel = false,
+                            onCancelDownload = {}
+                        )
                     }
                     Spacer(modifier = Modifier.height(24.dp))
                     HorizontalDivider()
@@ -515,6 +534,11 @@ private fun ManageStScreenPreview() {
         onSelectRepoRef = {},
         onDownloadAndInstallRef = {},
         customInstallValidationMessage = "",
+        showBackupOperationCard = false,
+        backupOperationTitle = "Exporting Backup",
+        backupOperationDetails = "Exporting backup…",
+        backupOperationProgressPercent = 42,
+        backupOperationAnchor = BackupOperationAnchor.EXPORT,
         showCustomOperationCard = false,
         customOperationTitle = "Installing Custom ST",
         customOperationDetails = "Installing dependencies (npm install)…",
