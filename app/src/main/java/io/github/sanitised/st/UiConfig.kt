@@ -46,13 +46,14 @@ fun ConfigScreen(
     onBack: () -> Unit,
     onOpenDocs: () -> Unit,
     canEdit: Boolean,
-    configFile: File
+    configFile: File,
+    onShowMessage: (String) -> Unit
 ) {
     val textState = rememberSaveable(stateSaver = TextFieldValue.Saver) {
         mutableStateOf(TextFieldValue(""))
     }
     val originalState = remember { mutableStateOf("") }
-    val statusState = remember { mutableStateOf("") }
+    val isSavingState = remember { mutableStateOf(false) }
     val showDiscardDialog = remember { mutableStateOf(false) }
     val missingState = remember { mutableStateOf(false) }
     val loadedState = remember { mutableStateOf(false) }
@@ -174,35 +175,29 @@ fun ConfigScreen(
                 Spacer(modifier = Modifier.height(12.dp))
                 Button(
                     onClick = {
-                        statusState.value = "Saving..."
+                        isSavingState.value = true
                         scope.launch(Dispatchers.IO) {
                             val result = runCatching {
                                 configFile.parentFile?.mkdirs()
                                 configFile.writeText(textState.value.text, Charsets.UTF_8)
                             }
                             withContext(Dispatchers.Main) {
+                                isSavingState.value = false
                                 if (result.isSuccess) {
                                     originalState.value = textState.value.text
-                                    statusState.value = "Saved"
+                                    onShowMessage("Config saved.")
                                 } else {
-                                    statusState.value =
+                                    onShowMessage(
                                         "Save failed: ${result.exceptionOrNull()?.message ?: "unknown error"}"
+                                    )
                                 }
                             }
                         }
                     },
-                    enabled = canEditEffective,
+                    enabled = canEditEffective && !isSavingState.value,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(text = "Save")
-                }
-                if (statusState.value.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = statusState.value,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Text(text = if (isSavingState.value) "Saving..." else "Save")
                 }
             }
         }

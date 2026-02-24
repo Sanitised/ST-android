@@ -41,7 +41,6 @@ fun SettingsScreen(
     onChannelChanged: (UpdateChannel) -> Unit,
     onCheckNow: () -> Unit,
     isChecking: Boolean,
-    statusMessage: String,
     showUpdatePrompt: Boolean,
     updateVersionLabel: String,
     updateDetails: String,
@@ -221,14 +220,6 @@ fun SettingsScreen(
                 ) {
                     Text(text = if (isChecking) "Checking..." else "Check for Updates Now")
                 }
-                if (statusMessage.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = statusMessage,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
             }
         }
     }
@@ -247,7 +238,6 @@ private fun SettingsScreenPreview() {
         onChannelChanged = {},
         onCheckNow = {},
         isChecking = false,
-        statusMessage = "New update v0.3.0 is available.",
         showUpdatePrompt = true,
         updateVersionLabel = "v0.3.0",
         updateDetails = "Tap Install to download and install.",

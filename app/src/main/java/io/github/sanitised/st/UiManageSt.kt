@@ -53,30 +53,28 @@ fun ManageStScreen(
     onBack: () -> Unit,
     isCustomInstalled: Boolean,
     customInstalledLabel: String?,
-    customStatus: String,
     serverRunning: Boolean,
     busyMessage: String,
     onExport: () -> Unit,
     onImport: () -> Unit,
-    backupStatus: String,
     customRepoInput: String,
     onCustomRepoInputChanged: (String) -> Unit,
     onLoadRepoRefs: () -> Unit,
     isLoadingRepoRefs: Boolean,
-    customRefStatus: String,
+    customRepoValidationMessage: String,
     featuredRefs: List<CustomRepoRefOption>,
     allRefs: List<CustomRepoRefOption>,
     selectedRefKey: String?,
     onSelectRepoRef: (String) -> Unit,
     onDownloadAndInstallRef: () -> Unit,
+    customInstallValidationMessage: String,
     isDownloadingCustomSource: Boolean,
     customSourceProgressPercent: Int?,
     customSourceStatus: String,
     onCancelCustomSourceDownload: () -> Unit,
     onLoadCustomZip: () -> Unit,
     onResetToDefault: () -> Unit,
-    onRemoveUserData: () -> Unit,
-    removeDataStatus: String
+    onRemoveUserData: () -> Unit
 ) {
     val allRefsByKey = remember(allRefs) { allRefs.associateBy { it.key } }
     val selectedRef = remember(selectedRefKey, allRefsByKey, featuredRefs) {
@@ -146,14 +144,6 @@ fun ManageStScreen(
                             Text(text = "Import Data")
                         }
                     }
-                    if (backupStatus.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            text = backupStatus,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
                     Spacer(modifier = Modifier.height(24.dp))
                     HorizontalDivider()
                     Spacer(modifier = Modifier.height(16.dp))
@@ -165,7 +155,7 @@ fun ManageStScreen(
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "Permanently delete all chats, characters, presets, worlds, " +
-                            "settings, and other user data stored by the app.",
+                                "settings, and other user data stored by the app.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -180,14 +170,6 @@ fun ManageStScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(text = "Remove All User Data")
-                    }
-                    if (removeDataStatus.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            text = removeDataStatus,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
                     }
                     Spacer(modifier = Modifier.height(24.dp))
                     HorizontalDivider()
@@ -229,11 +211,7 @@ fun ManageStScreen(
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )
                             WarningBullet(
-                                text = "Untrusted code can steal keys, chats, and characters.",
-                                color = MaterialTheme.colorScheme.onErrorContainer
-                            )
-                            WarningBullet(
-                                text = "It can also exfiltrate data and target other devices on your network.",
+                                text = "Untrusted code can steal keys, chats, and characters, as well as attack other devices on your network",
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )
                             WarningBullet(
@@ -265,12 +243,12 @@ fun ManageStScreen(
                     ) {
                         Text(text = if (isLoadingRepoRefs) "Loading refs..." else "Load Branches and Tags")
                     }
-                    if (customRefStatus.isNotBlank()) {
+                    if (customRepoValidationMessage.isNotBlank()) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = customRefStatus,
+                            text = customRepoValidationMessage,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.error
                         )
                     }
                     if (featuredRefs.isNotEmpty()) {
@@ -340,6 +318,14 @@ fun ManageStScreen(
                         }
                         Text(text = label)
                     }
+                    if (customInstallValidationMessage.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = customInstallValidationMessage,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
 
                     if (isDownloadingCustomSource) {
                         Spacer(modifier = Modifier.height(12.dp))
@@ -408,14 +394,6 @@ fun ManageStScreen(
                         ) {
                             Text(text = "Reset to Bundled Version")
                         }
-                    }
-                    if (customStatus.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            text = customStatus,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
                     }
                 }
             }
@@ -495,17 +473,15 @@ private fun ManageStScreenPreview() {
         onBack = {},
         isCustomInstalled = true,
         customInstalledLabel = "branch/staging-1234567",
-        customStatus = "Custom ST installed successfully.",
         serverRunning = false,
         busyMessage = "",
         onExport = {},
         onImport = {},
-        backupStatus = "",
         customRepoInput = "SillyTavern/SillyTavern",
         onCustomRepoInputChanged = {},
         onLoadRepoRefs = {},
         isLoadingRepoRefs = false,
-        customRefStatus = "Loaded 52 refs.",
+        customRepoValidationMessage = "",
         featuredRefs = listOf(
             CustomRepoRefOption("branch:staging", "branch: staging (abc1234)", "branch", "staging", "abc1234"),
             CustomRepoRefOption("branch:release", "branch: release (def5678)", "branch", "release", "def5678")
@@ -518,13 +494,13 @@ private fun ManageStScreenPreview() {
         selectedRefKey = "branch:staging",
         onSelectRepoRef = {},
         onDownloadAndInstallRef = {},
+        customInstallValidationMessage = "",
         isDownloadingCustomSource = false,
         customSourceProgressPercent = null,
         customSourceStatus = "",
         onCancelCustomSourceDownload = {},
         onLoadCustomZip = {},
         onResetToDefault = {},
-        onRemoveUserData = {},
-        removeDataStatus = ""
+        onRemoveUserData = {}
     )
 }

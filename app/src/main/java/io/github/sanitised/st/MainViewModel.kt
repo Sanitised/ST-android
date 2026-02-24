@@ -15,6 +15,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -109,16 +111,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val payload = NodePayload(application)
 
     internal val busyOperation = mutableStateOf<BusyOperation?>(null)
-    val backupStatus = mutableStateOf("")
-    val customStatus = mutableStateOf("")
-    val removeDataStatus = mutableStateOf("")
     val isCustomInstalled = mutableStateOf(
         payload.isCustomInstalled()
     )
     val customInstallLabel = mutableStateOf(payload.getCustomInstallLabel())
     val customRepoInput = mutableStateOf(DEFAULT_CUSTOM_ST_REPO)
     val isLoadingCustomRefs = mutableStateOf(false)
-    val customRefStatus = mutableStateOf("")
+    val customRepoValidationMessage = mutableStateOf("")
+    val customInstallValidationMessage = mutableStateOf("")
     val customFeaturedRefs = mutableStateOf<List<CustomRepoRefOption>>(emptyList())
     val customAllRefs = mutableStateOf<List<CustomRepoRefOption>>(emptyList())
     val selectedCustomRefKey = mutableStateOf<String?>(null)
@@ -145,13 +145,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         updatePrefs.getLong(PREF_UPDATE_DISMISSED_UNTIL_MS, 0L)
     )
     val isCheckingForUpdates = mutableStateOf(false)
-    val updateCheckStatus = mutableStateOf("")
     private val availableUpdate = mutableStateOf<GithubReleaseInfo?>(null)
     val isDownloadingUpdate = mutableStateOf(false)
     val downloadProgressPercent = mutableStateOf<Int?>(null)
     val updateBannerMessage = mutableStateOf("")
     val downloadedUpdateTag = mutableStateOf<String?>(null)
     val downloadedApkPath = mutableStateOf<String?>(null)
+    private val _snackbarMessages = MutableSharedFlow<String>(extraBufferCapacity = 16)
+    val snackbarMessages = _snackbarMessages.asSharedFlow()
 
     private var autoCheckAttempted = false
     private var updateDownloadJob: Job? = null
@@ -179,21 +180,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun export(uri: Uri) {
         busyOperation.value = BusyOperation.EXPORTING
-        backupStatus.value = "Exporting..."
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
                 NodeBackup.exportToUri(getApplication(), uri)
             }
             val msg = result.getOrElse { "Export failed: ${it.message ?: "unknown error"}" }
-            backupStatus.value = msg
             busyOperation.value = null
+            postUserMessage(msg)
             appendServiceLog(msg)
         }
     }
 
     fun import(uri: Uri) {
         busyOperation.value = BusyOperation.IMPORTING
-        backupStatus.value = "Importing..."
         val service = nodeService
         viewModelScope.launch {
             val importResult = withContext(Dispatchers.IO) {
@@ -213,23 +212,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     "Import complete, post-install failed: ${postInstallResult.exceptionOrNull()?.message ?: "unknown error"}"
                 else -> "Import complete"
             }
-            backupStatus.value = msg
             busyOperation.value = null
+            postUserMessage(msg)
             appendServiceLog(msg)
         }
     }
 
     fun installCustomZip(uri: Uri) {
-        if (busyOperation.value != null) return
+        if (busyOperation.value != null) {
+            postUserMessage("Wait for the current operation to finish.")
+            return
+        }
         busyOperation.value = BusyOperation.INSTALLING
-        customStatus.value = "Starting…"
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
-                payload.installCustomFromZip(uri) { msg ->
-                    viewModelScope.launch(Dispatchers.Main) {
-                        customStatus.value = msg
-                    }
-                }
+                payload.installCustomFromZip(uri) { }
             }
             refreshCustomInstallState()
             busyOperation.value = null
@@ -237,15 +234,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 onSuccess = { "Custom ST installed successfully." },
                 onFailure = { "Installation failed: ${it.message ?: "unknown error"}" }
             )
-            customStatus.value = msg
+            postUserMessage(msg)
             appendServiceLog(msg)
         }
     }
 
     fun resetToDefault() {
-        if (busyOperation.value != null) return
+        if (busyOperation.value != null) {
+            postUserMessage("Wait for the current operation to finish.")
+            return
+        }
         busyOperation.value = BusyOperation.RESETTING
-        customStatus.value = "Resetting…"
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
                 payload.resetToDefault()
@@ -256,34 +255,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 onSuccess = { "Reset to default complete." },
                 onFailure = { "Reset failed: ${it.message ?: "unknown error"}" }
             )
-            customStatus.value = msg
+            postUserMessage(msg)
             appendServiceLog(msg)
         }
     }
 
     fun setCustomRepoInput(value: String) {
         customRepoInput.value = value
+        customRepoValidationMessage.value = ""
     }
 
     fun selectCustomRepoRef(key: String) {
         selectedCustomRefKey.value = key
+        customInstallValidationMessage.value = ""
     }
 
     fun loadCustomRepoRefs() {
         if (isLoadingCustomRefs.value || isDownloadingCustomSource.value) return
         if (busyOperation.value != null && busyOperation.value != BusyOperation.DOWNLOADING_CUSTOM_SOURCE) {
-            customRefStatus.value = "Wait for the current operation to finish."
+            postUserMessage("Wait for the current operation to finish.")
             return
         }
         val parsedRepo = parseGithubRepoInput(customRepoInput.value)
         if (parsedRepo == null) {
-            customRefStatus.value = "Repo must be in owner/repo format."
+            customRepoValidationMessage.value = "Enter repo as owner/repo."
             customFeaturedRefs.value = emptyList()
             customAllRefs.value = emptyList()
             selectedCustomRefKey.value = null
             return
         }
-        customRefStatus.value = "Loading branches and tags..."
+        customRepoValidationMessage.value = ""
         isLoadingCustomRefs.value = true
         viewModelScope.launch {
             runCatching {
@@ -302,15 +303,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     all.isNotEmpty() -> all.first().key
                     else -> null
                 }
-                customRefStatus.value = when {
+                val resultMessage = when {
                     all.isEmpty() -> "No branches or tags found."
                     else -> "Loaded ${all.size} refs from ${parsedRepo.first}/${parsedRepo.second}."
                 }
+                postUserMessage(resultMessage)
             }.onFailure { error ->
                 customFeaturedRefs.value = emptyList()
                 customAllRefs.value = emptyList()
                 selectedCustomRefKey.value = null
-                customRefStatus.value = "Failed to load refs: ${error.message ?: "unknown error"}"
+                postUserMessage("Failed to load refs: ${error.message ?: "unknown error"}")
                 viewModelScope.launch {
                     appendServiceLog("custom-refs: failed: ${error.message ?: "unknown error"}")
                 }
@@ -321,18 +323,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun startCustomRepoInstall() {
         if (isDownloadingCustomSource.value) return
+        customInstallValidationMessage.value = ""
         if (busyOperation.value != null) {
-            customStatus.value = "Wait for the current operation to finish."
+            postUserMessage("Wait for the current operation to finish.")
             return
         }
         val parsedRepo = parseGithubRepoInput(customRepoInput.value)
         if (parsedRepo == null) {
-            customStatus.value = "Repo must be in owner/repo format."
+            customRepoValidationMessage.value = "Enter repo as owner/repo."
             return
         }
+        customRepoValidationMessage.value = ""
         val selectedRef = selectedCustomRef()
         if (selectedRef == null) {
-            customStatus.value = "Select a branch or tag first."
+            customInstallValidationMessage.value = "Select a branch or tag first."
             return
         }
 
@@ -341,7 +345,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         isDownloadingCustomSource.value = true
         customSourceProgressPercent.value = 0
         customSourceStatus.value = "Downloading ${selectedRef.refType} ${selectedRef.refName}..."
-        customStatus.value = customSourceStatus.value
 
         customSourceDownloadJob = viewModelScope.launch {
             val (owner, repo) = parsedRepo
@@ -372,7 +375,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             } else {
                                 "Downloading ${selectedRef.refType} ${selectedRef.refName}... $downloadedLabel / $totalLabel"
                             }
-                            customStatus.value = customSourceStatus.value
                         }
                     }
                 }
@@ -381,16 +383,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 customSourceProgressPercent.value = null
                 busyOperation.value = BusyOperation.INSTALLING
                 customSourceStatus.value = "Download complete. Installing..."
-                customStatus.value = customSourceStatus.value
 
                 val result = withContext(Dispatchers.IO) {
                     payload.installCustomFromZipFile(
                         zipFile = zipFile,
-                        onProgress = { msg ->
-                            viewModelScope.launch(Dispatchers.Main) {
-                                customStatus.value = msg
-                            }
-                        },
+                        onProgress = { },
                         sourceInfo = NodePayload.CustomInstallInfo(
                             repo = "$owner/$repo",
                             refType = selectedRef.refType,
@@ -408,24 +405,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         "Installation failed: ${it.message ?: "unknown error"}"
                     }
                 )
-                customStatus.value = finalMessage
-                customSourceStatus.value = finalMessage
+                postUserMessage(finalMessage)
                 appendServiceLog(finalMessage)
             } catch (_: CancellationException) {
-                customSourceStatus.value = "Custom source download canceled."
-                customStatus.value = customSourceStatus.value
+                postUserMessage("Custom source download canceled.")
             } catch (error: Exception) {
                 val detail = "custom-source-download: failed: ${error.message ?: "unknown error"}"
                 Log.w(TAG, detail)
                 appendServiceLog(detail)
-                customSourceStatus.value = "Custom source download failed."
-                customStatus.value = "Installation failed: ${error.message ?: "unknown error"}"
+                postUserMessage("Installation failed: ${error.message ?: "unknown error"}")
             } finally {
                 if (zipFile.exists()) {
                     zipFile.delete()
                 }
                 isDownloadingCustomSource.value = false
                 customSourceProgressPercent.value = null
+                customSourceStatus.value = ""
                 busyOperation.value = null
             }
         }
@@ -437,7 +432,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun removeUserData() {
         busyOperation.value = BusyOperation.REMOVING_DATA
-        removeDataStatus.value = "Removing data…"
         viewModelScope.launch {
             val paths = AppPaths(getApplication())
             withContext(Dispatchers.IO) {
@@ -445,8 +439,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 paths.dataDir.deleteRecursively()
             }
             val msg = "User data removed."
-            removeDataStatus.value = msg
             busyOperation.value = null
+            postUserMessage(msg)
             appendServiceLog(msg)
         }
     }
@@ -488,7 +482,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         setAutoCheckForUpdates(true)
         autoOptInPromptShown.value = true
         updatePrefs.edit().putBoolean(PREF_AUTO_OPTIN_PROMPT_SHOWN, true).apply()
-        updateCheckStatus.value = "Automatic checks enabled."
+        postUserMessage("Automatic checks enabled.")
         checkForUpdates("manual")
     }
 
@@ -521,14 +515,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val until = now + THREE_DAYS_MS
         updateDismissedUntilMs.value = until
         updatePrefs.edit().putLong(PREF_UPDATE_DISMISSED_UNTIL_MS, until).apply()
-        updateBannerMessage.value = "Update ${update.tagName} dismissed for 72 hours."
+        postUserMessage("Update ${update.tagName} dismissed for 72 hours.")
     }
 
     fun startAvailableUpdateDownload() {
         val update = availableUpdate.value ?: return
         val downloadUrl = update.apkAssetUrl
         if (downloadUrl.isNullOrBlank()) {
-            updateBannerMessage.value = "Update found, but this release does not include an Android install file."
+            postUserMessage("Update found, but this release does not include an Android install file.")
             return
         }
         if (isDownloadingUpdate.value) return
@@ -536,7 +530,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         updateDownloadJob?.cancel()
         isDownloadingUpdate.value = true
         downloadProgressPercent.value = 0
-        updateBannerMessage.value = "Downloading update ${update.tagName}..."
+        updateBannerMessage.value = ""
         updateDownloadJob = viewModelScope.launch {
             try {
                 val downloadedFile = withContext(Dispatchers.IO) {
@@ -555,12 +549,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 updateDismissedUntilMs.value = 0L
                 updatePrefs.edit().putLong(PREF_UPDATE_DISMISSED_UNTIL_MS, 0L).apply()
             } catch (_: CancellationException) {
-                updateBannerMessage.value = "Update download canceled."
+                postUserMessage("Update download canceled.")
+                updateBannerMessage.value = "Tap Install to download and install ${update.tagName}."
             } catch (e: Exception) {
                 val detail = "update-download: failed for ${update.tagName}: ${e.message ?: "unknown error"}"
                 Log.w(TAG, detail)
                 appendServiceLog(detail)
-                updateBannerMessage.value = "Update download failed. Please try again."
+                postUserMessage("Update download failed. Please try again.")
+                updateBannerMessage.value = "Tap Install to download and install ${update.tagName}."
             } finally {
                 isDownloadingUpdate.value = false
                 downloadProgressPercent.value = null
@@ -575,17 +571,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun installDownloadedUpdate(context: Context) {
         val candidate = availableUpdate.value
         if (candidate == null) {
-            updateBannerMessage.value = "No update is selected."
+            postUserMessage("No update is selected.")
             return
         }
         val apkPath = downloadedApkPath.value
         if (apkPath.isNullOrBlank()) {
-            updateBannerMessage.value = "Download the update first."
+            postUserMessage("Download the update first.")
             return
         }
         val apkFile = File(apkPath)
         if (!apkFile.exists()) {
-            updateBannerMessage.value = "Downloaded APK was not found."
+            postUserMessage("Downloaded APK was not found.")
             return
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
@@ -609,16 +605,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         runCatching {
             context.startActivity(installIntent)
         }.onSuccess {
-            updateBannerMessage.value = "Installer opened. Confirm installation to update."
+            postUserMessage("Installer opened. Confirm installation to update.")
         }.onFailure { error ->
-            updateBannerMessage.value = "Couldn't open installer: ${error.message ?: "unknown error"}"
+            postUserMessage("Couldn't open installer: ${error.message ?: "unknown error"}")
         }
     }
 
     fun checkForUpdates(reason: String = "manual") {
         if (isCheckingForUpdates.value) return
         isCheckingForUpdates.value = true
-        updateCheckStatus.value = "Checking for updates..."
         viewModelScope.launch {
             try {
                 val outcome = withContext(Dispatchers.IO) {
@@ -652,21 +647,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     when {
                         latest == null -> {
                             availableUpdate.value = null
-                            updateCheckStatus.value = "No published release was found."
+                            updateBannerMessage.value = ""
+                            if (reason == "manual") {
+                                postUserMessage("No published release was found.")
+                            }
                         }
                         !result.updateNeeded -> {
                             availableUpdate.value = null
-                            updateCheckStatus.value = "You're already on the latest version."
+                            updateBannerMessage.value = ""
+                            if (reason == "manual") {
+                                postUserMessage("You're already on the latest version.")
+                            }
                         }
                         latest.apkAssetUrl.isNullOrBlank() -> {
                             availableUpdate.value = null
-                            updateCheckStatus.value = "Update found, but this release does not include an Android install file."
+                            updateBannerMessage.value = ""
+                            if (reason == "manual") {
+                                postUserMessage("Update found, but this release does not include an Android install file.")
+                            }
                         }
                         else -> {
                             availableUpdate.value = latest
                             updateDismissedUntilMs.value = 0L
                             updatePrefs.edit().putLong(PREF_UPDATE_DISMISSED_UNTIL_MS, 0L).apply()
-                            updateCheckStatus.value = "New update ${latest.tagName} is available."
+                            if (reason == "manual") {
+                                postUserMessage("New update ${latest.tagName} is available.")
+                            }
                             if (isAvailableUpdateDownloaded()) {
                                 updateBannerMessage.value = "Update ${latest.tagName} is ready to install."
                             } else {
@@ -675,7 +681,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     }
                 }.onFailure {
-                    updateCheckStatus.value = "Update check failed. Please try again."
+                    if (reason == "manual") {
+                        postUserMessage("Update check failed. Please try again.")
+                    }
                 }
 
                 Log.i(TAG, detailMessage)
@@ -684,6 +692,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 isCheckingForUpdates.value = false
             }
         }
+    }
+
+    fun showTransientMessage(message: String) {
+        postUserMessage(message)
     }
 
     private fun ensureFirstLaunchTimestamp(): Long {
@@ -769,6 +781,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val segmentRegex = Regex("^[A-Za-z0-9._-]+$")
         if (!segmentRegex.matches(owner) || !segmentRegex.matches(repo)) return null
         return owner to repo
+    }
+
+    private fun postUserMessage(message: String) {
+        if (message.isBlank()) return
+        if (!_snackbarMessages.tryEmit(message)) {
+            viewModelScope.launch {
+                _snackbarMessages.emit(message)
+            }
+        }
     }
 
     private fun fetchCustomRepoRefs(

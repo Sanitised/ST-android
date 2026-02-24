@@ -15,20 +15,30 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Button
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.io.File
 import java.nio.file.Files
@@ -98,6 +108,7 @@ class MainActivity : ComponentActivity() {
             val notificationGrantedState = remember { mutableStateOf(isNotificationPermissionGranted()) }
             val lifecycleOwner = LocalLifecycleOwner.current
             val scope = rememberCoroutineScope()
+            val snackbarHostState = remember { SnackbarHostState() }
             val listener = remember {
                 object : NodeStatusListener {
                     override fun onStatus(status: NodeStatus) {
@@ -144,6 +155,11 @@ class MainActivity : ComponentActivity() {
             }
             LaunchedEffect(Unit) {
                 viewModel.maybeAutoCheckForUpdates()
+            }
+            LaunchedEffect(viewModel) {
+                viewModel.snackbarMessages.collectLatest { message ->
+                    snackbarHostState.showSnackbar(message)
+                }
             }
             LaunchedEffect(statusState.value.state) {
                 if (statusState.value.state != NodeState.RUNNING) {
@@ -215,249 +231,257 @@ class MainActivity : ComponentActivity() {
                 )
             }
 
-            // Screen routing
-            when {
-                showLogsState.value -> {
-                    BackHandler { showLogsState.value = false }
-                    LogsScreen(
-                        onBack = { showLogsState.value = false },
-                        stdoutLog = stdoutState.value,
-                        stderrLog = stderrState.value,
-                        serviceLog = serviceState.value
-                    )
-                }
-                showLicenseState.value != null -> {
-                    val doc = showLicenseState.value!!
-                    BackHandler { showLicenseState.value = null }
-                    LicenseTextScreen(
-                        onBack = { showLicenseState.value = null },
-                        doc = doc
-                    )
-                }
-                showLegalState.value -> {
-                    BackHandler { showLegalState.value = false }
-                    LegalScreen(
-                        onBack = { showLegalState.value = false },
-                        onOpenUrl = { url -> openUrl(url) },
-                        legalDocs = legalDocs,
-                        onOpenLicense = { doc -> showLicenseState.value = doc }
-                    )
-                }
-                showConfigState.value -> {
-                    ConfigScreen(
-                        onBack = { showConfigState.value = false },
-                        onOpenDocs = { openConfigDocs() },
-                        canEdit = statusState.value.state == NodeState.STOPPED || statusState.value.state == NodeState.ERROR,
-                        configFile = AppPaths(this).configFile
-                    )
-                }
-                showSettingsState.value -> {
-                    BackHandler { showSettingsState.value = false }
-                    SettingsScreen(
-                        onBack = { showSettingsState.value = false },
-                        autoCheckEnabled = viewModel.autoCheckForUpdates.value,
-                        onAutoCheckChanged = { enabled -> viewModel.setAutoCheckForUpdates(enabled) },
-                        autoOpenBrowserEnabled = viewModel.autoOpenBrowserWhenReady.value,
-                        onAutoOpenBrowserChanged = { enabled -> viewModel.setAutoOpenBrowserWhenReady(enabled) },
-                        channel = viewModel.updateChannel.value,
-                        onChannelChanged = { channel -> viewModel.setUpdateChannel(channel) },
-                        onCheckNow = { viewModel.checkForUpdates("manual") },
-                        isChecking = viewModel.isCheckingForUpdates.value,
-                        statusMessage = viewModel.updateCheckStatus.value,
-                        showUpdatePrompt = showUpdatePrompt,
-                        updateVersionLabel = viewModel.availableUpdateVersionLabel(),
-                        updateDetails = viewModel.updateBannerMessage.value,
-                        isDownloadingUpdate = viewModel.isDownloadingUpdate.value,
-                        downloadProgressPercent = viewModel.downloadProgressPercent.value,
-                        isUpdateReadyToInstall = isUpdateReadyToInstall,
-                        onUpdatePrimary = {
-                            if (isUpdateReadyToInstall) {
-                                viewModel.installDownloadedUpdate(this@MainActivity)
-                            } else {
-                                viewModel.startAvailableUpdateDownload()
-                            }
-                        },
-                        onUpdateDismiss = { viewModel.dismissAvailableUpdatePrompt() },
-                        onCancelUpdateDownload = { viewModel.cancelUpdateDownload() }
-                    )
-                }
-                showManageStState.value -> {
-                    BackHandler { showManageStState.value = false }
-                    ManageStScreen(
-                        onBack = { showManageStState.value = false },
-                        isCustomInstalled = viewModel.isCustomInstalled.value,
-                        customInstalledLabel = viewModel.customInstallLabel.value,
-                        customStatus = viewModel.customStatus.value,
-                        serverRunning = statusState.value.state == NodeState.RUNNING ||
-                            statusState.value.state == NodeState.STARTING,
-                        busyMessage = viewModel.busyMessage,
-                        onExport = triggerExport,
-                        onImport = triggerImport,
-                        backupStatus = viewModel.backupStatus.value,
-                        customRepoInput = viewModel.customRepoInput.value,
-                        onCustomRepoInputChanged = { viewModel.setCustomRepoInput(it) },
-                        onLoadRepoRefs = { viewModel.loadCustomRepoRefs() },
-                        isLoadingRepoRefs = viewModel.isLoadingCustomRefs.value,
-                        customRefStatus = viewModel.customRefStatus.value,
-                        featuredRefs = viewModel.customFeaturedRefs.value,
-                        allRefs = viewModel.customAllRefs.value,
-                        selectedRefKey = viewModel.selectedCustomRefKey.value,
-                        onSelectRepoRef = { key -> viewModel.selectCustomRepoRef(key) },
-                        onDownloadAndInstallRef = { viewModel.startCustomRepoInstall() },
-                        isDownloadingCustomSource = viewModel.isDownloadingCustomSource.value,
-                        customSourceProgressPercent = viewModel.customSourceProgressPercent.value,
-                        customSourceStatus = viewModel.customSourceStatus.value,
-                        onCancelCustomSourceDownload = { viewModel.cancelCustomSourceDownload() },
-                        onLoadCustomZip = {
-                            customZipLauncher.launch(
-                                arrayOf(
-                                    "application/zip",
-                                    "application/x-zip-compressed",
-                                    "application/octet-stream"
+            Box(modifier = Modifier.fillMaxSize()) {
+                // Screen routing
+                when {
+                    showLogsState.value -> {
+                        BackHandler { showLogsState.value = false }
+                        LogsScreen(
+                            onBack = { showLogsState.value = false },
+                            stdoutLog = stdoutState.value,
+                            stderrLog = stderrState.value,
+                            serviceLog = serviceState.value
+                        )
+                    }
+                    showLicenseState.value != null -> {
+                        val doc = showLicenseState.value!!
+                        BackHandler { showLicenseState.value = null }
+                        LicenseTextScreen(
+                            onBack = { showLicenseState.value = null },
+                            doc = doc
+                        )
+                    }
+                    showLegalState.value -> {
+                        BackHandler { showLegalState.value = false }
+                        LegalScreen(
+                            onBack = { showLegalState.value = false },
+                            onOpenUrl = { url -> openUrl(url) },
+                            legalDocs = legalDocs,
+                            onOpenLicense = { doc -> showLicenseState.value = doc }
+                        )
+                    }
+                    showConfigState.value -> {
+                        ConfigScreen(
+                            onBack = { showConfigState.value = false },
+                            onOpenDocs = { openConfigDocs() },
+                            canEdit = statusState.value.state == NodeState.STOPPED || statusState.value.state == NodeState.ERROR,
+                            configFile = AppPaths(this@MainActivity).configFile,
+                            onShowMessage = { message -> viewModel.showTransientMessage(message) }
+                        )
+                    }
+                    showSettingsState.value -> {
+                        BackHandler { showSettingsState.value = false }
+                        SettingsScreen(
+                            onBack = { showSettingsState.value = false },
+                            autoCheckEnabled = viewModel.autoCheckForUpdates.value,
+                            onAutoCheckChanged = { enabled -> viewModel.setAutoCheckForUpdates(enabled) },
+                            autoOpenBrowserEnabled = viewModel.autoOpenBrowserWhenReady.value,
+                            onAutoOpenBrowserChanged = { enabled -> viewModel.setAutoOpenBrowserWhenReady(enabled) },
+                            channel = viewModel.updateChannel.value,
+                            onChannelChanged = { channel -> viewModel.setUpdateChannel(channel) },
+                            onCheckNow = { viewModel.checkForUpdates("manual") },
+                            isChecking = viewModel.isCheckingForUpdates.value,
+                            showUpdatePrompt = showUpdatePrompt,
+                            updateVersionLabel = viewModel.availableUpdateVersionLabel(),
+                            updateDetails = viewModel.updateBannerMessage.value,
+                            isDownloadingUpdate = viewModel.isDownloadingUpdate.value,
+                            downloadProgressPercent = viewModel.downloadProgressPercent.value,
+                            isUpdateReadyToInstall = isUpdateReadyToInstall,
+                            onUpdatePrimary = {
+                                if (isUpdateReadyToInstall) {
+                                    viewModel.installDownloadedUpdate(this@MainActivity)
+                                } else {
+                                    viewModel.startAvailableUpdateDownload()
+                                }
+                            },
+                            onUpdateDismiss = { viewModel.dismissAvailableUpdatePrompt() },
+                            onCancelUpdateDownload = { viewModel.cancelUpdateDownload() }
+                        )
+                    }
+                    showManageStState.value -> {
+                        BackHandler { showManageStState.value = false }
+                        ManageStScreen(
+                            onBack = { showManageStState.value = false },
+                            isCustomInstalled = viewModel.isCustomInstalled.value,
+                            customInstalledLabel = viewModel.customInstallLabel.value,
+                            serverRunning = statusState.value.state == NodeState.RUNNING ||
+                                statusState.value.state == NodeState.STARTING,
+                            busyMessage = viewModel.busyMessage,
+                            onExport = triggerExport,
+                            onImport = triggerImport,
+                            customRepoInput = viewModel.customRepoInput.value,
+                            onCustomRepoInputChanged = { viewModel.setCustomRepoInput(it) },
+                            onLoadRepoRefs = { viewModel.loadCustomRepoRefs() },
+                            isLoadingRepoRefs = viewModel.isLoadingCustomRefs.value,
+                            customRepoValidationMessage = viewModel.customRepoValidationMessage.value,
+                            featuredRefs = viewModel.customFeaturedRefs.value,
+                            allRefs = viewModel.customAllRefs.value,
+                            selectedRefKey = viewModel.selectedCustomRefKey.value,
+                            onSelectRepoRef = { key -> viewModel.selectCustomRepoRef(key) },
+                            onDownloadAndInstallRef = { viewModel.startCustomRepoInstall() },
+                            customInstallValidationMessage = viewModel.customInstallValidationMessage.value,
+                            isDownloadingCustomSource = viewModel.isDownloadingCustomSource.value,
+                            customSourceProgressPercent = viewModel.customSourceProgressPercent.value,
+                            customSourceStatus = viewModel.customSourceStatus.value,
+                            onCancelCustomSourceDownload = { viewModel.cancelCustomSourceDownload() },
+                            onLoadCustomZip = {
+                                customZipLauncher.launch(
+                                    arrayOf(
+                                        "application/zip",
+                                        "application/x-zip-compressed",
+                                        "application/octet-stream"
+                                    )
                                 )
+                            },
+                            onResetToDefault = { showResetConfirm.value = true },
+                            onRemoveUserData = { showRemoveDataConfirm.value = true }
+                        )
+                    }
+                    else -> {
+                        STAndroidApp(
+                            status = statusState.value,
+                            busyMessage = viewModel.busyMessage,
+                            onStart = { startNode() },
+                            onStop = { stopNode() },
+                            onOpen = { openNodeUi(statusState.value.port) },
+                            autoOpenBrowserWhenReady = viewModel.autoOpenBrowserWhenReady.value,
+                            autoOpenBrowserTriggeredForCurrentRun = autoOpenBrowserTriggeredForCurrentRun.value,
+                            onAutoOpenBrowserTriggered = { autoOpenBrowserTriggeredForCurrentRun.value = true },
+                            onShowLogs = { showLogsState.value = true },
+                            onOpenNotificationSettings = { openNotificationSettings() },
+                            onEditConfig = { showConfigState.value = true },
+                            showNotificationPrompt = !notificationGrantedState.value,
+                            versionLabel = versionLabel,
+                            stLabel = if (viewModel.isCustomInstalled.value) {
+                                val customLabel = viewModel.customInstallLabel.value
+                                if (customLabel.isNullOrBlank()) {
+                                    "SillyTavern (custom version)"
+                                } else {
+                                    "SillyTavern ($customLabel)"
+                                }
+                            } else stLabel,
+                            nodeLabel = nodeLabel,
+                            symlinkSupported = symlinkSupported,
+                            onShowLegal = { showLegalState.value = true },
+                            showAutoCheckOptInPrompt = showAutoCheckOptInPrompt,
+                            onEnableAutoCheck = { viewModel.acceptAutoCheckOptInPrompt() },
+                            onLaterAutoCheck = { viewModel.dismissAutoCheckOptInPrompt() },
+                            showUpdatePrompt = showUpdatePrompt,
+                            updateVersionLabel = viewModel.availableUpdateVersionLabel(),
+                            updateDetails = viewModel.updateBannerMessage.value,
+                            isDownloadingUpdate = viewModel.isDownloadingUpdate.value,
+                            downloadProgressPercent = viewModel.downloadProgressPercent.value,
+                            isUpdateReadyToInstall = isUpdateReadyToInstall,
+                            onUpdatePrimary = {
+                                if (isUpdateReadyToInstall) {
+                                    viewModel.installDownloadedUpdate(this@MainActivity)
+                                } else {
+                                    viewModel.startAvailableUpdateDownload()
+                                }
+                            },
+                            onUpdateDismiss = { viewModel.dismissAvailableUpdatePrompt() },
+                            onCancelUpdateDownload = { viewModel.cancelUpdateDownload() },
+                            showCustomSourceDownload = viewModel.isDownloadingCustomSource.value,
+                            customSourceDownloadPercent = viewModel.customSourceProgressPercent.value,
+                            customSourceStatus = viewModel.customSourceStatus.value,
+                            onCancelCustomSourceDownload = { viewModel.cancelCustomSourceDownload() },
+                            onShowSettings = { showSettingsState.value = true },
+                            onShowManageSt = { showManageStState.value = true }
+                        )
+                    }
+                }
+
+                // Dialogs overlay whichever screen is active
+                if (showResetConfirm.value) {
+                    androidx.compose.material3.AlertDialog(
+                        onDismissRequest = { showResetConfirm.value = false },
+                        title = { Text(text = "Reset to default?") },
+                        text = {
+                            Text(
+                                text = "This will reinstall the SillyTavern version bundled " +
+                                    "with the app. Your data (chats, characters, settings) " +
+                                    "will not be affected."
                             )
                         },
-                        onResetToDefault = { showResetConfirm.value = true },
-                        onRemoveUserData = { showRemoveDataConfirm.value = true },
-                        removeDataStatus = viewModel.removeDataStatus.value
-                    )
-                }
-                else -> {
-                    STAndroidApp(
-                        status = statusState.value,
-                        busyMessage = viewModel.busyMessage,
-                        onStart = { startNode() },
-                        onStop = { stopNode() },
-                        onOpen = { openNodeUi(statusState.value.port) },
-                        autoOpenBrowserWhenReady = viewModel.autoOpenBrowserWhenReady.value,
-                        autoOpenBrowserTriggeredForCurrentRun = autoOpenBrowserTriggeredForCurrentRun.value,
-                        onAutoOpenBrowserTriggered = { autoOpenBrowserTriggeredForCurrentRun.value = true },
-                        onShowLogs = { showLogsState.value = true },
-                        onOpenNotificationSettings = { openNotificationSettings() },
-                        onEditConfig = { showConfigState.value = true },
-                        showNotificationPrompt = !notificationGrantedState.value,
-                        versionLabel = versionLabel,
-                        stLabel = if (viewModel.isCustomInstalled.value) {
-                            val customLabel = viewModel.customInstallLabel.value
-                            if (customLabel.isNullOrBlank()) {
-                                "SillyTavern (custom version)"
-                            } else {
-                                "SillyTavern ($customLabel)"
-                            }
-                        } else stLabel,
-                        nodeLabel = nodeLabel,
-                        symlinkSupported = symlinkSupported,
-                        onShowLegal = { showLegalState.value = true },
-                        showAutoCheckOptInPrompt = showAutoCheckOptInPrompt,
-                        onEnableAutoCheck = { viewModel.acceptAutoCheckOptInPrompt() },
-                        onLaterAutoCheck = { viewModel.dismissAutoCheckOptInPrompt() },
-                        showUpdatePrompt = showUpdatePrompt,
-                        updateVersionLabel = viewModel.availableUpdateVersionLabel(),
-                        updateDetails = viewModel.updateBannerMessage.value,
-                        isDownloadingUpdate = viewModel.isDownloadingUpdate.value,
-                        downloadProgressPercent = viewModel.downloadProgressPercent.value,
-                        isUpdateReadyToInstall = isUpdateReadyToInstall,
-                        onUpdatePrimary = {
-                            if (isUpdateReadyToInstall) {
-                                viewModel.installDownloadedUpdate(this@MainActivity)
-                            } else {
-                                viewModel.startAvailableUpdateDownload()
+                        confirmButton = {
+                            Button(onClick = {
+                                showResetConfirm.value = false
+                                viewModel.resetToDefault()
+                            }) {
+                                Text(text = "Reset")
                             }
                         },
-                        onUpdateDismiss = { viewModel.dismissAvailableUpdatePrompt() },
-                        onCancelUpdateDownload = { viewModel.cancelUpdateDownload() },
-                        showCustomSourceDownload = viewModel.isDownloadingCustomSource.value,
-                        customSourceDownloadPercent = viewModel.customSourceProgressPercent.value,
-                        customSourceStatus = viewModel.customSourceStatus.value,
-                        onCancelCustomSourceDownload = { viewModel.cancelCustomSourceDownload() },
-                        onShowSettings = { showSettingsState.value = true },
-                        onShowManageSt = { showManageStState.value = true }
+                        dismissButton = {
+                            Button(onClick = { showResetConfirm.value = false }) {
+                                Text(text = "Cancel")
+                            }
+                        }
                     )
                 }
-            }
+                if (showRemoveDataConfirm.value) {
+                    androidx.compose.material3.AlertDialog(
+                        onDismissRequest = { showRemoveDataConfirm.value = false },
+                        title = { Text(text = "Remove all user data?") },
+                        text = {
+                            Text(
+                                text = "This will permanently delete ALL your chats, characters, " +
+                                    "presets, worlds, settings, and any other data stored by the app. " +
+                                    "This cannot be undone. Export a backup first if you want to keep anything."
+                            )
+                        },
+                        confirmButton = {
+                            Button(onClick = {
+                                showRemoveDataConfirm.value = false
+                                viewModel.removeUserData()
+                            }) {
+                                Text(text = "Remove")
+                            }
+                        },
+                        dismissButton = {
+                            Button(onClick = { showRemoveDataConfirm.value = false }) {
+                                Text(text = "Cancel")
+                            }
+                        }
+                    )
+                }
+                if (showImportConfirm.value) {
+                    androidx.compose.material3.AlertDialog(
+                        onDismissRequest = { showImportConfirm.value = false },
+                        title = { Text(text = "Import backup?") },
+                        text = {
+                            Text(
+                                text = "YOUR EXISTING DATA WILL BE OVERWRITTEN. " +
+                                    "Make sure the server is stopped before importing."
+                            )
+                        },
+                        confirmButton = {
+                            Button(onClick = {
+                                val uri = pendingImportUri.value
+                                showImportConfirm.value = false
+                                pendingImportUri.value = null
+                                if (uri == null) return@Button
+                                viewModel.import(uri)
+                            }) {
+                                Text(text = "Import")
+                            }
+                        },
+                        dismissButton = {
+                            Button(onClick = {
+                                showImportConfirm.value = false
+                                pendingImportUri.value = null
+                            }) {
+                                Text(text = "Cancel")
+                            }
+                        }
+                    )
+                }
 
-            // Dialogs overlay whichever screen is active
-            if (showResetConfirm.value) {
-                androidx.compose.material3.AlertDialog(
-                    onDismissRequest = { showResetConfirm.value = false },
-                    title = { Text(text = "Reset to default?") },
-                    text = {
-                        Text(
-                            text = "This will reinstall the SillyTavern version bundled " +
-                                "with the app. Your data (chats, characters, settings) " +
-                                "will not be affected."
-                        )
-                    },
-                    confirmButton = {
-                        Button(onClick = {
-                            showResetConfirm.value = false
-                            viewModel.resetToDefault()
-                        }) {
-                            Text(text = "Reset")
-                        }
-                    },
-                    dismissButton = {
-                        Button(onClick = { showResetConfirm.value = false }) {
-                            Text(text = "Cancel")
-                        }
-                    }
-                )
-            }
-            if (showRemoveDataConfirm.value) {
-                androidx.compose.material3.AlertDialog(
-                    onDismissRequest = { showRemoveDataConfirm.value = false },
-                    title = { Text(text = "Remove all user data?") },
-                    text = {
-                        Text(
-                            text = "This will permanently delete ALL your chats, characters, " +
-                                "presets, worlds, settings, and any other data stored by the app. " +
-                                "This cannot be undone. Export a backup first if you want to keep anything."
-                        )
-                    },
-                    confirmButton = {
-                        Button(onClick = {
-                            showRemoveDataConfirm.value = false
-                            viewModel.removeUserData()
-                        }) {
-                            Text(text = "Remove")
-                        }
-                    },
-                    dismissButton = {
-                        Button(onClick = { showRemoveDataConfirm.value = false }) {
-                            Text(text = "Cancel")
-                        }
-                    }
-                )
-            }
-            if (showImportConfirm.value) {
-                androidx.compose.material3.AlertDialog(
-                    onDismissRequest = { showImportConfirm.value = false },
-                    title = { Text(text = "Import backup?") },
-                    text = {
-                        Text(
-                            text = "YOUR EXISTING DATA WILL BE OVERWRITTEN. " +
-                                "Make sure the server is stopped before importing."
-                        )
-                    },
-                    confirmButton = {
-                        Button(onClick = {
-                            val uri = pendingImportUri.value
-                            showImportConfirm.value = false
-                            pendingImportUri.value = null
-                            if (uri == null) return@Button
-                            viewModel.import(uri)
-                        }) {
-                            Text(text = "Import")
-                        }
-                    },
-                    dismissButton = {
-                        Button(onClick = {
-                            showImportConfirm.value = false
-                            pendingImportUri.value = null
-                        }) {
-                            Text(text = "Cancel")
-                        }
-                    }
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
                 )
             }
         }
