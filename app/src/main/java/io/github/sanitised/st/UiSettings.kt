@@ -66,7 +66,7 @@ fun SettingsScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TextButton(onClick = onBack) {
-                    Text(text = "< Back")
+                    Text(text = "← Back")
                 }
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
@@ -113,7 +113,7 @@ fun SettingsScreen(
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Checks once on app startup when enabled.",
+                            text = "Checks on app startup, no more than once per day.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -202,7 +202,7 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Column {
                             Text(
-                                text = "Prerelease",
+                                text = "Pre-release",
                                 style = MaterialTheme.typography.bodyLarge
                             )
                             Text(

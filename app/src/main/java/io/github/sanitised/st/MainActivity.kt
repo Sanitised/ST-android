@@ -171,7 +171,7 @@ class MainActivity : ComponentActivity() {
                         assetPath = "legal/apache-2.0.txt",
                     ),
                     LegalDoc(
-                        title = "SillyTavern Dependencies and licenses (package-lock.json)",
+                        title = "SillyTavern Dependencies and Licenses (package-lock.json)",
                         assetPath = "legal/sillytavern_package-lock.json"
                     )
                 )

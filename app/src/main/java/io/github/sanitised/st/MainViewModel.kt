@@ -267,10 +267,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun selectCustomRepoRef(key: String) {
         selectedCustomRefKey.value = key
-        val selected = selectedCustomRef()
-        if (selected != null) {
-            customRefStatus.value = "Selected ${selected.refType} ${selected.refName}"
-        }
     }
 
     fun loadCustomRepoRefs() {
@@ -532,7 +528,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val update = availableUpdate.value ?: return
         val downloadUrl = update.apkAssetUrl
         if (downloadUrl.isNullOrBlank()) {
-            updateBannerMessage.value = "Update found, but APK asset is missing."
+            updateBannerMessage.value = "Update found, but this release does not include an Android install file."
             return
         }
         if (isDownloadingUpdate.value) return
@@ -600,7 +596,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 Uri.parse("package:${context.packageName}")
             ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(settingsIntent)
-            updateBannerMessage.value = "Allow install permission, then tap Install now again."
+            updateBannerMessage.value = "Allow installs from this source, then tap Install now again."
             return
         }
         val authority = "${context.packageName}.fileprovider"
@@ -664,7 +660,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         }
                         latest.apkAssetUrl.isNullOrBlank() -> {
                             availableUpdate.value = null
-                            updateCheckStatus.value = "Update found, but no APK file is attached."
+                            updateCheckStatus.value = "Update found, but this release does not include an Android install file."
                         }
                         else -> {
                             availableUpdate.value = latest

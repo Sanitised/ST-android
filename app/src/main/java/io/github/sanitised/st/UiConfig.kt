@@ -208,7 +208,7 @@ fun ConfigScreen(
         AlertDialog(
             onDismissRequest = { showDiscardDialog.value = false },
             title = { Text(text = "Discard changes?") },
-            text = { Text(text = "You have unsaved changes. Go back and lose them?") },
+            text = { Text(text = "You have unsaved changes. If you go back, they will be lost.") },
             confirmButton = {
                 TextButton(onClick = {
                     showDiscardDialog.value = false

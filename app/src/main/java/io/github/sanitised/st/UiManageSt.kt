@@ -233,6 +233,10 @@ fun ManageStScreen(
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )
                             WarningBullet(
+                                text = "It can also exfiltrate data and target other devices on your network.",
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            WarningBullet(
                                 text = "Downgrades/forks can break data.",
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )
@@ -304,7 +308,7 @@ fun ManageStScreen(
                                 enabled = buttonsEnabled && !isDownloadingCustomSource,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text(text = "More refs (${allRefs.size})")
+                                Text(text = "More options (${allRefs.size})")
                             }
                             DropdownMenu(
                                 expanded = showMoreRefsMenu.value,
@@ -330,9 +334,9 @@ fun ManageStScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         val label = if (selectedRef == null) {
-                            "Download and Install Selected Ref"
+                            "Install Selected Version"
                         } else {
-                            "Download and Install from ${selectedRef.refType}: ${selectedRef.refName}"
+                            "Install Selected Version (${selectedRef.refType}: ${selectedRef.refName})"
                         }
                         Text(text = label)
                     }
@@ -358,7 +362,7 @@ fun ManageStScreen(
                     Spacer(modifier = Modifier.height(10.dp))
                     InstructionStep(
                         "1",
-                        "Open the repository page in GitHub",
+                        "Open the repository page on GitHub",
                         url = "https://github.com/SillyTavern/SillyTavern"
                     )
                     InstructionStep("2", "Choose the branch/tag/commit")
