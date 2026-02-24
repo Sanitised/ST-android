@@ -8,14 +8,15 @@ import android.os.Build
 import android.provider.Settings
 import android.util.Log
 import androidx.core.content.FileProvider
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
@@ -23,7 +24,6 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
-import kotlin.coroutines.coroutineContext
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -98,6 +98,14 @@ data class CustomRepoRefOption(
     val commitSha: String?
 )
 
+data class OperationCardState(
+    val visible: Boolean = false,
+    val title: String = "",
+    val details: String = "",
+    val progressPercent: Int? = null,
+    val cancelable: Boolean = false
+)
+
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     companion object {
         private const val TAG = "UpdateCheck"
@@ -115,8 +123,60 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         private const val MAX_GITHUB_PAGES = 5
         private const val MAX_FEATURED_REFS = 6
         private const val DOWNLOAD_BUFFER_SIZE = 16 * 1024
+        private const val UNKNOWN_LENGTH_PROGRESS_STEP_BYTES = 512L * 1024L
         private const val ONE_DAY_MS = 24L * 60L * 60L * 1000L
         private const val THREE_DAYS_MS = 72L * 60L * 60L * 1000L
+    }
+
+    private class OperationCardController(
+        private val scope: CoroutineScope
+    ) {
+        val state = mutableStateOf(OperationCardState())
+        private var token = 0L
+
+        fun start(
+            title: String,
+            details: String,
+            progressPercent: Int?,
+            cancelable: Boolean
+        ) {
+            token += 1
+            state.value = OperationCardState(
+                visible = true,
+                title = title,
+                details = details,
+                progressPercent = progressPercent,
+                cancelable = cancelable
+            )
+        }
+
+        fun update(
+            details: String? = null,
+            progressPercent: Int? = state.value.progressPercent,
+            cancelable: Boolean? = null
+        ) {
+            val current = state.value
+            state.value = current.copy(
+                details = details ?: current.details,
+                progressPercent = progressPercent,
+                cancelable = cancelable ?: current.cancelable
+            )
+        }
+
+        fun finish(finalMessage: String) {
+            val finishToken = token
+            state.value = state.value.copy(
+                details = finalMessage,
+                progressPercent = null,
+                cancelable = false
+            )
+            scope.launch {
+                delay(1500)
+                if (finishToken == token) {
+                    state.value = OperationCardState()
+                }
+            }
+        }
     }
 
     private val updatePrefs = application.getSharedPreferences(UPDATE_PREFS_NAME, Context.MODE_PRIVATE)
@@ -135,16 +195,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val customAllRefs = mutableStateOf<List<CustomRepoRefOption>>(emptyList())
     val selectedCustomRefKey = mutableStateOf<String?>(null)
     val isDownloadingCustomSource = mutableStateOf(false)
-    val customOperationCardVisible = mutableStateOf(false)
-    val customOperationCardTitle = mutableStateOf("")
-    val customOperationCardDetails = mutableStateOf("")
-    val customOperationCardProgressPercent = mutableStateOf<Int?>(null)
-    val customOperationCardCancelable = mutableStateOf(false)
+    private val customOperationCardController = OperationCardController(viewModelScope)
+    val customOperationCard: MutableState<OperationCardState> = customOperationCardController.state
     val customOperationCardAnchor = mutableStateOf(CustomOperationAnchor.GITHUB_INSTALL)
-    val backupOperationCardVisible = mutableStateOf(false)
-    val backupOperationCardTitle = mutableStateOf("")
-    val backupOperationCardDetails = mutableStateOf("")
-    val backupOperationCardProgressPercent = mutableStateOf<Int?>(null)
+    private val backupOperationCardController = OperationCardController(viewModelScope)
+    val backupOperationCard: MutableState<OperationCardState> = backupOperationCardController.state
     val backupOperationCardAnchor = mutableStateOf(BackupOperationAnchor.EXPORT)
     val autoCheckForUpdates = mutableStateOf(
         updatePrefs.getBoolean(PREF_AUTO_CHECK, false)
@@ -178,8 +233,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var autoCheckAttempted = false
     private var updateDownloadJob: Job? = null
     private var customSourceDownloadJob: Job? = null
-    private var customOperationCardToken = 0L
-    private var backupOperationCardToken = 0L
 
     // Updated by MainActivity when the service connection changes.
     var nodeService: NodeService? = null
@@ -884,42 +937,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         cancelable: Boolean,
         anchor: CustomOperationAnchor
     ) {
-        customOperationCardToken += 1
-        customOperationCardVisible.value = true
-        customOperationCardTitle.value = title
-        customOperationCardDetails.value = details
-        customOperationCardProgressPercent.value = progressPercent
-        customOperationCardCancelable.value = cancelable
         customOperationCardAnchor.value = anchor
+        customOperationCardController.start(
+            title = title,
+            details = details,
+            progressPercent = progressPercent,
+            cancelable = cancelable
+        )
     }
 
     private fun updateCustomOperationCard(
         details: String? = null,
-        progressPercent: Int? = customOperationCardProgressPercent.value,
+        progressPercent: Int? = customOperationCard.value.progressPercent,
         cancelable: Boolean? = null
     ) {
-        if (details != null) {
-            customOperationCardDetails.value = details
-        }
-        customOperationCardProgressPercent.value = progressPercent
-        if (cancelable != null) {
-            customOperationCardCancelable.value = cancelable
-        }
+        customOperationCardController.update(
+            details = details,
+            progressPercent = progressPercent,
+            cancelable = cancelable
+        )
     }
 
     private fun finishCustomOperationCard(finalMessage: String) {
-        val token = customOperationCardToken
-        customOperationCardDetails.value = finalMessage
-        customOperationCardProgressPercent.value = null
-        customOperationCardCancelable.value = false
-        viewModelScope.launch {
-            delay(1500)
-            if (token == customOperationCardToken) {
-                customOperationCardVisible.value = false
-                customOperationCardTitle.value = ""
-                customOperationCardDetails.value = ""
-            }
-        }
+        customOperationCardController.finish(finalMessage)
     }
 
     private fun startBackupOperationCard(
@@ -928,36 +968,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         progressPercent: Int?,
         anchor: BackupOperationAnchor
     ) {
-        backupOperationCardToken += 1
-        backupOperationCardVisible.value = true
-        backupOperationCardTitle.value = title
-        backupOperationCardDetails.value = details
-        backupOperationCardProgressPercent.value = progressPercent
         backupOperationCardAnchor.value = anchor
+        backupOperationCardController.start(
+            title = title,
+            details = details,
+            progressPercent = progressPercent,
+            cancelable = false
+        )
     }
 
     private fun updateBackupOperationCard(
         details: String? = null,
-        progressPercent: Int? = backupOperationCardProgressPercent.value
+        progressPercent: Int? = backupOperationCard.value.progressPercent
     ) {
-        if (details != null) {
-            backupOperationCardDetails.value = details
-        }
-        backupOperationCardProgressPercent.value = progressPercent
+        backupOperationCardController.update(
+            details = details,
+            progressPercent = progressPercent
+        )
     }
 
     private fun finishBackupOperationCard(finalMessage: String) {
-        val token = backupOperationCardToken
-        backupOperationCardDetails.value = finalMessage
-        backupOperationCardProgressPercent.value = null
-        viewModelScope.launch {
-            delay(1500)
-            if (token == backupOperationCardToken) {
-                backupOperationCardVisible.value = false
-                backupOperationCardTitle.value = ""
-                backupOperationCardDetails.value = ""
-            }
-        }
+        backupOperationCardController.finish(finalMessage)
     }
 
     private fun fetchCustomRepoRefs(
@@ -1158,74 +1189,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         outputFile: File,
         onProgress: suspend (Long, Long?) -> Unit
     ) {
-        val tempFile = File(outputFile.parentFile, "${outputFile.name}.part")
-        if (tempFile.exists()) tempFile.delete()
-
-        val connection = (URL(downloadUrl).openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = 20_000
-            readTimeout = 20_000
-            setRequestProperty("Accept", "application/octet-stream")
-            setRequestProperty("Accept-Encoding", "identity")
-            setRequestProperty("User-Agent", "st-android-custom-st")
-        }
-
-        try {
-            val status = connection.responseCode
-            if (status !in 200..299) {
-                val body = connection.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
-                val shortBody = body.replace('\n', ' ').take(240)
-                throw IllegalStateException("Download HTTP $status: $shortBody")
-            }
-
-            val totalBytes = sequenceOf(
-                connection.contentLengthLong,
-                connection.getHeaderFieldLong("X-Linked-Size", -1L),
-                connection.getHeaderFieldLong("x-goog-stored-content-length", -1L),
-                connection.getHeaderFieldLong("Content-Length", -1L)
-            ).firstOrNull { it > 0L }
-            var downloadedBytes = 0L
-            var lastProgress = -1
-            var lastReportedBytesBucket = -1L
-
-            connection.inputStream.use { input ->
-                tempFile.outputStream().use { output ->
-                    val buffer = ByteArray(DOWNLOAD_BUFFER_SIZE)
-                    while (true) {
-                        coroutineContext.ensureActive()
-                        val read = input.read(buffer)
-                        if (read < 0) break
-                        output.write(buffer, 0, read)
-                        downloadedBytes += read
-                        if (totalBytes != null) {
-                            val progress = ((downloadedBytes * 100L) / totalBytes).toInt().coerceIn(0, 100)
-                            if (progress != lastProgress) {
-                                lastProgress = progress
-                                onProgress(downloadedBytes, totalBytes)
-                            }
-                        } else {
-                            val bucket = downloadedBytes / (512L * 1024L)
-                            if (bucket != lastReportedBytesBucket) {
-                                lastReportedBytesBucket = bucket
-                                onProgress(downloadedBytes, null)
-                            }
-                        }
-                    }
-                }
-            }
-            if (totalBytes != null && lastProgress < 100) {
-                onProgress(totalBytes, totalBytes)
-            }
-
-            if (outputFile.exists()) outputFile.delete()
-            if (!tempFile.renameTo(outputFile)) {
-                tempFile.copyTo(outputFile, overwrite = true)
-                tempFile.delete()
-            }
-        } finally {
-            if (tempFile.exists()) tempFile.delete()
-            connection.disconnect()
-        }
+        HttpDownloader.downloadToFile(
+            downloadUrl = downloadUrl,
+            outputFile = outputFile,
+            userAgent = "st-android-custom-st",
+            bufferSize = DOWNLOAD_BUFFER_SIZE,
+            acceptEncodingIdentity = true,
+            extraTotalBytesHeaders = listOf(
+                "X-Linked-Size",
+                "x-goog-stored-content-length",
+                "Content-Length"
+            ),
+            unknownLengthProgressStepBytes = UNKNOWN_LENGTH_PROGRESS_STEP_BYTES,
+            onProgress = onProgress
+        )
     }
 
     private suspend fun downloadApk(
@@ -1240,72 +1217,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         val safeTag = tagName.replace(Regex("[^A-Za-z0-9._-]"), "_")
         val outputFile = File(updatesDir, "st-android-$safeTag.apk")
-        val tempFile = File(updatesDir, "st-android-$safeTag.apk.part")
-        if (tempFile.exists()) {
-            tempFile.delete()
+        HttpDownloader.downloadToFile(
+            downloadUrl = downloadUrl,
+            outputFile = outputFile,
+            userAgent = "st-android-updater",
+            bufferSize = DOWNLOAD_BUFFER_SIZE,
+            unknownLengthProgressStepBytes = UNKNOWN_LENGTH_PROGRESS_STEP_BYTES
+        ) { downloadedBytes, totalBytes ->
+            if (totalBytes != null && totalBytes > 0L) {
+                val progress = ((downloadedBytes * 100L) / totalBytes).toInt().coerceIn(0, 100)
+                onProgress(progress)
+            } else {
+                onProgress(null)
+            }
         }
-
-        val connection = (URL(downloadUrl).openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = 20_000
-            readTimeout = 20_000
-            setRequestProperty("Accept", "application/octet-stream")
-            setRequestProperty("User-Agent", "st-android-updater")
-        }
-
-        try {
-            val status = connection.responseCode
-            if (status !in 200..299) {
-                val body = connection.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
-                val shortBody = body.replace('\n', ' ').take(240)
-                throw IllegalStateException("Download HTTP $status: $shortBody")
-            }
-
-            val totalBytes = connection.contentLengthLong.takeIf { it > 0L }
-            var downloadedBytes = 0L
-            var lastProgress = -1
-            var lastReportedBytesBucket = -1L
-
-            connection.inputStream.use { input ->
-                tempFile.outputStream().use { output ->
-                    val buffer = ByteArray(DOWNLOAD_BUFFER_SIZE)
-                    while (true) {
-                        coroutineContext.ensureActive()
-                        val read = input.read(buffer)
-                        if (read < 0) break
-                        output.write(buffer, 0, read)
-                        downloadedBytes += read
-                        if (totalBytes != null) {
-                            val progress = ((downloadedBytes * 100L) / totalBytes).toInt().coerceIn(0, 100)
-                            if (progress != lastProgress) {
-                                lastProgress = progress
-                                onProgress(progress)
-                            }
-                        } else {
-                            val bucket = downloadedBytes / (512L * 1024L)
-                            if (bucket != lastReportedBytesBucket) {
-                                lastReportedBytesBucket = bucket
-                                onProgress(null)
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (outputFile.exists()) {
-                outputFile.delete()
-            }
-            if (!tempFile.renameTo(outputFile)) {
-                tempFile.copyTo(outputFile, overwrite = true)
-                tempFile.delete()
-            }
-            return outputFile
-        } finally {
-            if (tempFile.exists()) {
-                tempFile.delete()
-            }
-            connection.disconnect()
-        }
+        return outputFile
     }
 
     private fun performUpdateCheck(channel: UpdateChannel): UpdateCheckOutcome {

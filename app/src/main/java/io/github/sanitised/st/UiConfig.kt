@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
@@ -62,6 +64,7 @@ fun ConfigScreen(
     val missingState = remember { mutableStateOf(false) }
     val loadedState = remember { mutableStateOf(false) }
     val hasUserEdits = remember { mutableStateOf(false) }
+    val editorScrollState = rememberScrollState()
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
@@ -154,22 +157,26 @@ fun ConfigScreen(
                         .weight(1f, fill = true)
                 ) {
                     if (loadedState.value) {
-                        OutlinedTextField(
-                            value = textState.value,
-                            onValueChange = {
-                                if (canEditEffective) {
-                                    textState.value = it
-                                    hasUserEdits.value = true
-                                }
-                            },
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .focusRequester(focusRequester),
-                            enabled = canEditEffective,
-                            textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                            label = { Text(text = "config.yaml") },
-                            maxLines = Int.MAX_VALUE
-                        )
+                        val scrollbarColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                        Box(modifier = Modifier.fillMaxSize().verticalScrollbar(editorScrollState, scrollbarColor)) {
+                            OutlinedTextField(
+                                value = textState.value,
+                                onValueChange = {
+                                    if (canEditEffective) {
+                                        textState.value = it
+                                        hasUserEdits.value = true
+                                    }
+                                },
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .verticalScroll(editorScrollState)
+                                    .focusRequester(focusRequester),
+                                enabled = canEditEffective,
+                                textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                label = { Text(text = "config.yaml") },
+                                maxLines = Int.MAX_VALUE
+                            )
+                        }
                     } else {
                         Text(
                             text = "Loading...",

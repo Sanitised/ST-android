@@ -45,6 +45,22 @@ import java.nio.file.Files
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
+private sealed interface AppScreen {
+    object Home : AppScreen
+    object Logs : AppScreen
+    object Config : AppScreen
+    object Legal : AppScreen
+    object Settings : AppScreen
+    object ManageSt : AppScreen
+    data class License(val doc: LegalDoc) : AppScreen
+}
+
+private sealed interface PendingDialog {
+    object ResetToDefault : PendingDialog
+    object RemoveUserData : PendingDialog
+    data class ConfirmImport(val uri: Uri) : PendingDialog
+}
+
 class MainActivity : ComponentActivity() {
     private val nodeServiceState = mutableStateOf<NodeService?>(null)
 
@@ -91,20 +107,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             val viewModel: MainViewModel = viewModel()
             val statusState = remember { mutableStateOf(NodeStatus(NodeState.STOPPED, "Idle")) }
-            val showLogsState = remember { mutableStateOf(false) }
-            val showConfigState = remember { mutableStateOf(false) }
-            val showLegalState = remember { mutableStateOf(false) }
-            val showLicenseState = remember { mutableStateOf<LegalDoc?>(null) }
-            val showSettingsState = remember { mutableStateOf(false) }
-            val showManageStState = remember { mutableStateOf(false) }
+            val currentScreen = remember { mutableStateOf<AppScreen>(AppScreen.Home) }
             val autoOpenBrowserTriggeredForCurrentRun = remember { mutableStateOf(false) }
             val stdoutState = remember { mutableStateOf("") }
             val stderrState = remember { mutableStateOf("") }
             val serviceState = remember { mutableStateOf("") }
-            val pendingImportUri = remember { mutableStateOf<Uri?>(null) }
-            val showImportConfirm = remember { mutableStateOf(false) }
-            val showResetConfirm = remember { mutableStateOf(false) }
-            val showRemoveDataConfirm = remember { mutableStateOf(false) }
+            val pendingDialogState = remember { mutableStateOf<PendingDialog?>(null) }
             val notificationGrantedState = remember { mutableStateOf(isNotificationPermissionGranted()) }
             val lifecycleOwner = LocalLifecycleOwner.current
             val scope = rememberCoroutineScope()
@@ -139,10 +147,10 @@ class MainActivity : ComponentActivity() {
                 onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
             }
 
-            LaunchedEffect(showLogsState.value) {
-                if (!showLogsState.value) return@LaunchedEffect
+            LaunchedEffect(currentScreen.value) {
+                if (currentScreen.value !is AppScreen.Logs) return@LaunchedEffect
                 val paths = AppPaths(this@MainActivity)
-                while (showLogsState.value) {
+                while (currentScreen.value is AppScreen.Logs) {
                     val logsDir = paths.logsDir
                     val stdoutFile = File(logsDir, "node_stdout.log")
                     val stderrFile = File(logsDir, "node_stderr.log")
@@ -204,8 +212,7 @@ class MainActivity : ComponentActivity() {
                 ActivityResultContracts.OpenDocument()
             ) { uri ->
                 if (uri == null) return@rememberLauncherForActivityResult
-                pendingImportUri.value = uri
-                showImportConfirm.value = true
+                pendingDialogState.value = PendingDialog.ConfirmImport(uri)
             }
             val customZipLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.OpenDocument()
@@ -232,47 +239,49 @@ class MainActivity : ComponentActivity() {
             }
 
             Box(modifier = Modifier.fillMaxSize()) {
-                // Screen routing
-                when {
-                    showLogsState.value -> {
-                        BackHandler { showLogsState.value = false }
+                when (val screen = currentScreen.value) {
+                    AppScreen.Logs -> {
+                        BackHandler { currentScreen.value = AppScreen.Home }
                         LogsScreen(
-                            onBack = { showLogsState.value = false },
+                            onBack = { currentScreen.value = AppScreen.Home },
                             stdoutLog = stdoutState.value,
                             stderrLog = stderrState.value,
                             serviceLog = serviceState.value
                         )
                     }
-                    showLicenseState.value != null -> {
-                        val doc = showLicenseState.value!!
-                        BackHandler { showLicenseState.value = null }
+
+                    is AppScreen.License -> {
+                        BackHandler { currentScreen.value = AppScreen.Legal }
                         LicenseTextScreen(
-                            onBack = { showLicenseState.value = null },
-                            doc = doc
+                            onBack = { currentScreen.value = AppScreen.Legal },
+                            doc = screen.doc
                         )
                     }
-                    showLegalState.value -> {
-                        BackHandler { showLegalState.value = false }
+
+                    AppScreen.Legal -> {
+                        BackHandler { currentScreen.value = AppScreen.Home }
                         LegalScreen(
-                            onBack = { showLegalState.value = false },
+                            onBack = { currentScreen.value = AppScreen.Home },
                             onOpenUrl = { url -> openUrl(url) },
                             legalDocs = legalDocs,
-                            onOpenLicense = { doc -> showLicenseState.value = doc }
+                            onOpenLicense = { doc -> currentScreen.value = AppScreen.License(doc) }
                         )
                     }
-                    showConfigState.value -> {
+
+                    AppScreen.Config -> {
                         ConfigScreen(
-                            onBack = { showConfigState.value = false },
+                            onBack = { currentScreen.value = AppScreen.Home },
                             onOpenDocs = { openConfigDocs() },
                             canEdit = statusState.value.state == NodeState.STOPPED || statusState.value.state == NodeState.ERROR,
                             configFile = AppPaths(this@MainActivity).configFile,
                             onShowMessage = { message -> viewModel.showTransientMessage(message) }
                         )
                     }
-                    showSettingsState.value -> {
-                        BackHandler { showSettingsState.value = false }
+
+                    AppScreen.Settings -> {
+                        BackHandler { currentScreen.value = AppScreen.Home }
                         SettingsScreen(
-                            onBack = { showSettingsState.value = false },
+                            onBack = { currentScreen.value = AppScreen.Home },
                             autoCheckEnabled = viewModel.autoCheckForUpdates.value,
                             onAutoCheckChanged = { enabled -> viewModel.setAutoCheckForUpdates(enabled) },
                             autoOpenBrowserEnabled = viewModel.autoOpenBrowserWhenReady.value,
@@ -298,14 +307,15 @@ class MainActivity : ComponentActivity() {
                             onCancelUpdateDownload = { viewModel.cancelUpdateDownload() }
                         )
                     }
-                    showManageStState.value -> {
-                        BackHandler { showManageStState.value = false }
+
+                    AppScreen.ManageSt -> {
+                        BackHandler { currentScreen.value = AppScreen.Home }
                         ManageStScreen(
-                            onBack = { showManageStState.value = false },
+                            onBack = { currentScreen.value = AppScreen.Home },
                             isCustomInstalled = viewModel.isCustomInstalled.value,
                             customInstalledLabel = viewModel.customInstallLabel.value,
                             serverRunning = statusState.value.state == NodeState.RUNNING ||
-                                statusState.value.state == NodeState.STARTING,
+                                    statusState.value.state == NodeState.STARTING,
                             busyMessage = viewModel.busyMessage,
                             onExport = triggerExport,
                             onImport = triggerImport,
@@ -320,16 +330,16 @@ class MainActivity : ComponentActivity() {
                             onSelectRepoRef = { key -> viewModel.selectCustomRepoRef(key) },
                             onDownloadAndInstallRef = { viewModel.startCustomRepoInstall() },
                             customInstallValidationMessage = viewModel.customInstallValidationMessage.value,
-                            showBackupOperationCard = viewModel.backupOperationCardVisible.value,
-                            backupOperationTitle = viewModel.backupOperationCardTitle.value,
-                            backupOperationDetails = viewModel.backupOperationCardDetails.value,
-                            backupOperationProgressPercent = viewModel.backupOperationCardProgressPercent.value,
+                            showBackupOperationCard = viewModel.backupOperationCard.value.visible,
+                            backupOperationTitle = viewModel.backupOperationCard.value.title,
+                            backupOperationDetails = viewModel.backupOperationCard.value.details,
+                            backupOperationProgressPercent = viewModel.backupOperationCard.value.progressPercent,
                             backupOperationAnchor = viewModel.backupOperationCardAnchor.value,
-                            showCustomOperationCard = viewModel.customOperationCardVisible.value,
-                            customOperationTitle = viewModel.customOperationCardTitle.value,
-                            customOperationDetails = viewModel.customOperationCardDetails.value,
-                            customOperationProgressPercent = viewModel.customOperationCardProgressPercent.value,
-                            customOperationCancelable = viewModel.customOperationCardCancelable.value,
+                            showCustomOperationCard = viewModel.customOperationCard.value.visible,
+                            customOperationTitle = viewModel.customOperationCard.value.title,
+                            customOperationDetails = viewModel.customOperationCard.value.details,
+                            customOperationProgressPercent = viewModel.customOperationCard.value.progressPercent,
+                            customOperationCancelable = viewModel.customOperationCard.value.cancelable,
                             customOperationAnchor = viewModel.customOperationCardAnchor.value,
                             onCancelCustomOperation = { viewModel.cancelCustomSourceDownload() },
                             onLoadCustomZip = {
@@ -341,11 +351,12 @@ class MainActivity : ComponentActivity() {
                                     )
                                 )
                             },
-                            onResetToDefault = { showResetConfirm.value = true },
-                            onRemoveUserData = { showRemoveDataConfirm.value = true }
+                            onResetToDefault = { pendingDialogState.value = PendingDialog.ResetToDefault },
+                            onRemoveUserData = { pendingDialogState.value = PendingDialog.RemoveUserData }
                         )
                     }
-                    else -> {
+
+                    AppScreen.Home -> {
                         STAndroidApp(
                             status = statusState.value,
                             busyMessage = viewModel.busyMessage,
@@ -355,9 +366,9 @@ class MainActivity : ComponentActivity() {
                             autoOpenBrowserWhenReady = viewModel.autoOpenBrowserWhenReady.value,
                             autoOpenBrowserTriggeredForCurrentRun = autoOpenBrowserTriggeredForCurrentRun.value,
                             onAutoOpenBrowserTriggered = { autoOpenBrowserTriggeredForCurrentRun.value = true },
-                            onShowLogs = { showLogsState.value = true },
+                            onShowLogs = { currentScreen.value = AppScreen.Logs },
                             onOpenNotificationSettings = { openNotificationSettings() },
-                            onEditConfig = { showConfigState.value = true },
+                            onEditConfig = { currentScreen.value = AppScreen.Config },
                             showNotificationPrompt = !notificationGrantedState.value,
                             versionLabel = versionLabel,
                             stLabel = if (viewModel.isCustomInstalled.value) {
@@ -370,7 +381,7 @@ class MainActivity : ComponentActivity() {
                             } else stLabel,
                             nodeLabel = nodeLabel,
                             symlinkSupported = symlinkSupported,
-                            onShowLegal = { showLegalState.value = true },
+                            onShowLegal = { currentScreen.value = AppScreen.Legal },
                             showAutoCheckOptInPrompt = showAutoCheckOptInPrompt,
                             onEnableAutoCheck = { viewModel.acceptAutoCheckOptInPrompt() },
                             onLaterAutoCheck = { viewModel.dismissAutoCheckOptInPrompt() },
@@ -389,105 +400,104 @@ class MainActivity : ComponentActivity() {
                             },
                             onUpdateDismiss = { viewModel.dismissAvailableUpdatePrompt() },
                             onCancelUpdateDownload = { viewModel.cancelUpdateDownload() },
-                            showBackupOperationCard = viewModel.backupOperationCardVisible.value,
-                            backupOperationTitle = viewModel.backupOperationCardTitle.value,
-                            backupOperationDetails = viewModel.backupOperationCardDetails.value,
-                            backupOperationProgressPercent = viewModel.backupOperationCardProgressPercent.value,
-                            showCustomOperationCard = viewModel.customOperationCardVisible.value,
-                            customOperationTitle = viewModel.customOperationCardTitle.value,
-                            customOperationDetails = viewModel.customOperationCardDetails.value,
-                            customOperationProgressPercent = viewModel.customOperationCardProgressPercent.value,
-                            customOperationCancelable = viewModel.customOperationCardCancelable.value,
+                            showBackupOperationCard = viewModel.backupOperationCard.value.visible,
+                            backupOperationTitle = viewModel.backupOperationCard.value.title,
+                            backupOperationDetails = viewModel.backupOperationCard.value.details,
+                            backupOperationProgressPercent = viewModel.backupOperationCard.value.progressPercent,
+                            showCustomOperationCard = viewModel.customOperationCard.value.visible,
+                            customOperationTitle = viewModel.customOperationCard.value.title,
+                            customOperationDetails = viewModel.customOperationCard.value.details,
+                            customOperationProgressPercent = viewModel.customOperationCard.value.progressPercent,
+                            customOperationCancelable = viewModel.customOperationCard.value.cancelable,
                             onCancelCustomOperation = { viewModel.cancelCustomSourceDownload() },
-                            onShowSettings = { showSettingsState.value = true },
-                            onShowManageSt = { showManageStState.value = true }
+                            onShowSettings = { currentScreen.value = AppScreen.Settings },
+                            onShowManageSt = { currentScreen.value = AppScreen.ManageSt }
                         )
                     }
                 }
 
-                // Dialogs overlay whichever screen is active
-                if (showResetConfirm.value) {
-                    androidx.compose.material3.AlertDialog(
-                        onDismissRequest = { showResetConfirm.value = false },
-                        title = { Text(text = "Reset to default?") },
-                        text = {
-                            Text(
-                                text = "This will reinstall the SillyTavern version bundled " +
-                                    "with the app. Your data (chats, characters, settings) " +
-                                    "will not be affected."
-                            )
-                        },
-                        confirmButton = {
-                            Button(onClick = {
-                                showResetConfirm.value = false
-                                viewModel.resetToDefault()
-                            }) {
-                                Text(text = "Reset")
+                when (val dialog = pendingDialogState.value) {
+                    PendingDialog.ResetToDefault -> {
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = { pendingDialogState.value = null },
+                            title = { Text(text = "Reset to default?") },
+                            text = {
+                                Text(
+                                    text = "This will reinstall the SillyTavern version bundled " +
+                                            "with the app. Your data (chats, characters, settings) " +
+                                            "will not be affected."
+                                )
+                            },
+                            confirmButton = {
+                                Button(onClick = {
+                                    pendingDialogState.value = null
+                                    viewModel.resetToDefault()
+                                }) {
+                                    Text(text = "Reset")
+                                }
+                            },
+                            dismissButton = {
+                                Button(onClick = { pendingDialogState.value = null }) {
+                                    Text(text = "Cancel")
+                                }
                             }
-                        },
-                        dismissButton = {
-                            Button(onClick = { showResetConfirm.value = false }) {
-                                Text(text = "Cancel")
+                        )
+                    }
+
+                    PendingDialog.RemoveUserData -> {
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = { pendingDialogState.value = null },
+                            title = { Text(text = "Remove all user data?") },
+                            text = {
+                                Text(
+                                    text = "This will permanently delete ALL your current chats, characters, " +
+                                            "presets, worlds, settings, and any other data stored by the app. " +
+                                            "This cannot be undone. Export a backup first if you want to keep anything."
+                                )
+                            },
+                            confirmButton = {
+                                Button(onClick = {
+                                    pendingDialogState.value = null
+                                    viewModel.removeUserData()
+                                }) {
+                                    Text(text = "Import")
+                                }
+                            },
+                            dismissButton = {
+                                Button(onClick = { pendingDialogState.value = null }) {
+                                    Text(text = "Cancel")
+                                }
                             }
-                        }
-                    )
-                }
-                if (showRemoveDataConfirm.value) {
-                    androidx.compose.material3.AlertDialog(
-                        onDismissRequest = { showRemoveDataConfirm.value = false },
-                        title = { Text(text = "Remove all user data?") },
-                        text = {
-                            Text(
-                                text = "This will permanently delete ALL your chats, characters, " +
-                                    "presets, worlds, settings, and any other data stored by the app. " +
-                                    "This cannot be undone. Export a backup first if you want to keep anything."
-                            )
-                        },
-                        confirmButton = {
-                            Button(onClick = {
-                                showRemoveDataConfirm.value = false
-                                viewModel.removeUserData()
-                            }) {
-                                Text(text = "Remove")
+                        )
+                    }
+
+                    is PendingDialog.ConfirmImport -> {
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = { pendingDialogState.value = null },
+                            title = { Text(text = "Import backup?") },
+                            text = {
+                                Text(
+                                    text = "YOUR EXISTING DATA WILL BE OVERWRITTEN. "
+                                )
+                            },
+                            confirmButton = {
+                                Button(onClick = {
+                                    val importUri = dialog.uri
+                                    pendingDialogState.value = null
+                                    viewModel.import(importUri)
+                                }) {
+                                    Text(text = "Import")
+                                }
+                            },
+                            dismissButton = {
+                                Button(onClick = { pendingDialogState.value = null }) {
+                                    Text(text = "Cancel")
+                                }
                             }
-                        },
-                        dismissButton = {
-                            Button(onClick = { showRemoveDataConfirm.value = false }) {
-                                Text(text = "Cancel")
-                            }
-                        }
-                    )
-                }
-                if (showImportConfirm.value) {
-                    androidx.compose.material3.AlertDialog(
-                        onDismissRequest = { showImportConfirm.value = false },
-                        title = { Text(text = "Import backup?") },
-                        text = {
-                            Text(
-                                text = "YOUR EXISTING DATA WILL BE OVERWRITTEN. " +
-                                    "Make sure the server is stopped before importing."
-                            )
-                        },
-                        confirmButton = {
-                            Button(onClick = {
-                                val uri = pendingImportUri.value
-                                showImportConfirm.value = false
-                                pendingImportUri.value = null
-                                if (uri == null) return@Button
-                                viewModel.import(uri)
-                            }) {
-                                Text(text = "Import")
-                            }
-                        },
-                        dismissButton = {
-                            Button(onClick = {
-                                showImportConfirm.value = false
-                                pendingImportUri.value = null
-                            }) {
-                                Text(text = "Cancel")
-                            }
-                        }
-                    )
+                        )
+                    }
+
+                    null -> Unit
                 }
 
                 SnackbarHost(
@@ -593,9 +603,18 @@ class MainActivity : ComponentActivity() {
         } catch (_: Exception) {
             false
         } finally {
-            try { link.delete() } catch (_: Exception) { }
-            try { target.delete() } catch (_: Exception) { }
-            try { dir.delete() } catch (_: Exception) { }
+            try {
+                link.delete()
+            } catch (_: Exception) {
+            }
+            try {
+                target.delete()
+            } catch (_: Exception) {
+            }
+            try {
+                dir.delete()
+            } catch (_: Exception) {
+            }
         }
     }
 }
