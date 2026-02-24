@@ -214,7 +214,7 @@ class NodeService : Service() {
         }
         val logFile = File(logsDir, "service.log")
         rotateLogIfNeeded(logFile, MAX_LOG_BYTES)
-        val line = "${System.currentTimeMillis()}: $message\n"
+        val line = formatServiceLogLine(message)
         logFile.appendText(line, Charsets.UTF_8)
     }
 

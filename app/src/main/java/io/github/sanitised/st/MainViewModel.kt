@@ -1324,7 +1324,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val logsDir = AppPaths(getApplication()).logsDir
             if (!logsDir.exists()) logsDir.mkdirs()
             val logFile = File(logsDir, "service.log")
-            logFile.appendText("${System.currentTimeMillis()}: $message\n", Charsets.UTF_8)
+            logFile.appendText(formatServiceLogLine(message), Charsets.UTF_8)
         }
     }
 }
