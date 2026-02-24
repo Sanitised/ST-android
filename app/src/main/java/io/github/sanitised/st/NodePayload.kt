@@ -561,9 +561,10 @@ class NodePayload(private val context: Context) {
      * Delete the custom ST installation and restore the bundled version.
      * User data is not affected.
      */
-    fun resetToDefault(): Result<Unit> {
+    fun resetToDefault(onProgress: (String) -> Unit = {}): Result<Unit> {
         return runCatching {
             val paths = AppPaths(context)
+            onProgress("Removing custom installation…")
             val edit = payloadPrefs().edit()
                 .remove(PREF_CUSTOM_INSTALLED)
                 .remove(PREF_ST_PAYLOAD_VERSION)
@@ -572,7 +573,9 @@ class NodePayload(private val context: Context) {
             if (Files.exists(paths.stDir.toPath(), LinkOption.NOFOLLOW_LINKS)) {
                 paths.stDir.toPath().deleteRecursively()
             }
+            onProgress("Restoring bundled version…")
             ensureExtracted().getOrThrow()
+            onProgress("Done!")
         }
     }
 

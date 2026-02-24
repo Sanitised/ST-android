@@ -320,10 +320,12 @@ class MainActivity : ComponentActivity() {
                             onSelectRepoRef = { key -> viewModel.selectCustomRepoRef(key) },
                             onDownloadAndInstallRef = { viewModel.startCustomRepoInstall() },
                             customInstallValidationMessage = viewModel.customInstallValidationMessage.value,
-                            isDownloadingCustomSource = viewModel.isDownloadingCustomSource.value,
-                            customSourceProgressPercent = viewModel.customSourceProgressPercent.value,
-                            customSourceStatus = viewModel.customSourceStatus.value,
-                            onCancelCustomSourceDownload = { viewModel.cancelCustomSourceDownload() },
+                            showCustomOperationCard = viewModel.customOperationCardVisible.value,
+                            customOperationTitle = viewModel.customOperationCardTitle.value,
+                            customOperationDetails = viewModel.customOperationCardDetails.value,
+                            customOperationProgressPercent = viewModel.customOperationCardProgressPercent.value,
+                            customOperationCancelable = viewModel.customOperationCardCancelable.value,
+                            onCancelCustomOperation = { viewModel.cancelCustomSourceDownload() },
                             onLoadCustomZip = {
                                 customZipLauncher.launch(
                                     arrayOf(
@@ -381,10 +383,12 @@ class MainActivity : ComponentActivity() {
                             },
                             onUpdateDismiss = { viewModel.dismissAvailableUpdatePrompt() },
                             onCancelUpdateDownload = { viewModel.cancelUpdateDownload() },
-                            showCustomSourceDownload = viewModel.isDownloadingCustomSource.value,
-                            customSourceDownloadPercent = viewModel.customSourceProgressPercent.value,
-                            customSourceStatus = viewModel.customSourceStatus.value,
-                            onCancelCustomSourceDownload = { viewModel.cancelCustomSourceDownload() },
+                            showCustomOperationCard = viewModel.customOperationCardVisible.value,
+                            customOperationTitle = viewModel.customOperationCardTitle.value,
+                            customOperationProgressPercent = viewModel.customOperationCardProgressPercent.value,
+                            customOperationDetails = viewModel.customOperationCardDetails.value,
+                            customOperationCancelable = viewModel.customOperationCardCancelable.value,
+                            onCancelCustomOperation = { viewModel.cancelCustomSourceDownload() },
                             onShowSettings = { showSettingsState.value = true },
                             onShowManageSt = { showManageStState.value = true }
                         )

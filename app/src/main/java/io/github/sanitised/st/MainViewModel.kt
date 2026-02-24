@@ -14,6 +14,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -123,8 +124,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val customAllRefs = mutableStateOf<List<CustomRepoRefOption>>(emptyList())
     val selectedCustomRefKey = mutableStateOf<String?>(null)
     val isDownloadingCustomSource = mutableStateOf(false)
-    val customSourceProgressPercent = mutableStateOf<Int?>(null)
-    val customSourceStatus = mutableStateOf("")
+    val customOperationCardVisible = mutableStateOf(false)
+    val customOperationCardTitle = mutableStateOf("")
+    val customOperationCardDetails = mutableStateOf("")
+    val customOperationCardProgressPercent = mutableStateOf<Int?>(null)
+    val customOperationCardCancelable = mutableStateOf(false)
     val autoCheckForUpdates = mutableStateOf(
         updatePrefs.getBoolean(PREF_AUTO_CHECK, false)
     )
@@ -157,6 +161,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var autoCheckAttempted = false
     private var updateDownloadJob: Job? = null
     private var customSourceDownloadJob: Job? = null
+    private var customOperationCardToken = 0L
 
     // Updated by MainActivity when the service connection changes.
     var nodeService: NodeService? = null
@@ -224,9 +229,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         busyOperation.value = BusyOperation.INSTALLING
+        startCustomOperationCard(
+            title = "Installing Custom ST",
+            details = "Preparing archive…",
+            progressPercent = null,
+            cancelable = false
+        )
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
-                payload.installCustomFromZip(uri) { }
+                payload.installCustomFromZip(uri) { msg ->
+                    viewModelScope.launch(Dispatchers.Main) {
+                        updateCustomOperationCard(details = msg)
+                    }
+                }
             }
             refreshCustomInstallState()
             busyOperation.value = null
@@ -234,7 +249,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 onSuccess = { "Custom ST installed successfully." },
                 onFailure = { "Installation failed: ${it.message ?: "unknown error"}" }
             )
-            postUserMessage(msg)
+            finishCustomOperationCard(msg)
             appendServiceLog(msg)
         }
     }
@@ -245,9 +260,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         busyOperation.value = BusyOperation.RESETTING
+        startCustomOperationCard(
+            title = "Resetting to Bundled Version",
+            details = "Preparing reset…",
+            progressPercent = null,
+            cancelable = false
+        )
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
-                payload.resetToDefault()
+                payload.resetToDefault { msg ->
+                    viewModelScope.launch(Dispatchers.Main) {
+                        updateCustomOperationCard(details = msg)
+                    }
+                }
             }
             refreshCustomInstallState()
             busyOperation.value = null
@@ -255,7 +280,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 onSuccess = { "Reset to default complete." },
                 onFailure = { "Reset failed: ${it.message ?: "unknown error"}" }
             )
-            postUserMessage(msg)
+            finishCustomOperationCard(msg)
             appendServiceLog(msg)
         }
     }
@@ -343,8 +368,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         customSourceDownloadJob?.cancel()
         busyOperation.value = BusyOperation.DOWNLOADING_CUSTOM_SOURCE
         isDownloadingCustomSource.value = true
-        customSourceProgressPercent.value = 0
-        customSourceStatus.value = "Downloading ${selectedRef.refType} ${selectedRef.refName}..."
+        startCustomOperationCard(
+            title = "Installing Custom ST",
+            details = "Downloading ${selectedRef.refType} ${selectedRef.refName}...",
+            progressPercent = 0,
+            cancelable = true
+        )
 
         customSourceDownloadJob = viewModelScope.launch {
             val (owner, repo) = parsedRepo
@@ -367,27 +396,38 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             } else {
                                 null
                             }
-                            customSourceProgressPercent.value = progress
                             val downloadedLabel = formatByteCount(downloadedBytes)
                             val totalLabel = totalBytes?.let { formatByteCount(it) }
-                            customSourceStatus.value = if (totalLabel == null) {
+                            val details = if (totalLabel == null) {
                                 "Downloading ${selectedRef.refType} ${selectedRef.refName}... $downloadedLabel"
                             } else {
                                 "Downloading ${selectedRef.refType} ${selectedRef.refName}... $downloadedLabel / $totalLabel"
                             }
+                            updateCustomOperationCard(
+                                details = details,
+                                progressPercent = progress,
+                                cancelable = true
+                            )
                         }
                     }
                 }
 
                 isDownloadingCustomSource.value = false
-                customSourceProgressPercent.value = null
                 busyOperation.value = BusyOperation.INSTALLING
-                customSourceStatus.value = "Download complete. Installing..."
+                updateCustomOperationCard(
+                    details = "Download complete. Installing...",
+                    progressPercent = null,
+                    cancelable = false
+                )
 
                 val result = withContext(Dispatchers.IO) {
                     payload.installCustomFromZipFile(
                         zipFile = zipFile,
-                        onProgress = { },
+                        onProgress = { msg ->
+                            viewModelScope.launch(Dispatchers.Main) {
+                                updateCustomOperationCard(details = msg)
+                            }
+                        },
                         sourceInfo = NodePayload.CustomInstallInfo(
                             repo = "$owner/$repo",
                             refType = selectedRef.refType,
@@ -405,22 +445,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         "Installation failed: ${it.message ?: "unknown error"}"
                     }
                 )
-                postUserMessage(finalMessage)
+                finishCustomOperationCard(finalMessage)
                 appendServiceLog(finalMessage)
             } catch (_: CancellationException) {
-                postUserMessage("Custom source download canceled.")
+                finishCustomOperationCard("Custom source download canceled.")
             } catch (error: Exception) {
                 val detail = "custom-source-download: failed: ${error.message ?: "unknown error"}"
                 Log.w(TAG, detail)
                 appendServiceLog(detail)
-                postUserMessage("Installation failed: ${error.message ?: "unknown error"}")
+                finishCustomOperationCard("Installation failed: ${error.message ?: "unknown error"}")
             } finally {
                 if (zipFile.exists()) {
                     zipFile.delete()
                 }
                 isDownloadingCustomSource.value = false
-                customSourceProgressPercent.value = null
-                customSourceStatus.value = ""
                 busyOperation.value = null
             }
         }
@@ -788,6 +826,49 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (!_snackbarMessages.tryEmit(message)) {
             viewModelScope.launch {
                 _snackbarMessages.emit(message)
+            }
+        }
+    }
+
+    private fun startCustomOperationCard(
+        title: String,
+        details: String,
+        progressPercent: Int?,
+        cancelable: Boolean
+    ) {
+        customOperationCardToken += 1
+        customOperationCardVisible.value = true
+        customOperationCardTitle.value = title
+        customOperationCardDetails.value = details
+        customOperationCardProgressPercent.value = progressPercent
+        customOperationCardCancelable.value = cancelable
+    }
+
+    private fun updateCustomOperationCard(
+        details: String? = null,
+        progressPercent: Int? = customOperationCardProgressPercent.value,
+        cancelable: Boolean? = null
+    ) {
+        if (details != null) {
+            customOperationCardDetails.value = details
+        }
+        customOperationCardProgressPercent.value = progressPercent
+        if (cancelable != null) {
+            customOperationCardCancelable.value = cancelable
+        }
+    }
+
+    private fun finishCustomOperationCard(finalMessage: String) {
+        val token = customOperationCardToken
+        customOperationCardDetails.value = finalMessage
+        customOperationCardProgressPercent.value = null
+        customOperationCardCancelable.value = false
+        viewModelScope.launch {
+            delay(1500)
+            if (token == customOperationCardToken) {
+                customOperationCardVisible.value = false
+                customOperationCardTitle.value = ""
+                customOperationCardDetails.value = ""
             }
         }
     }

@@ -74,10 +74,12 @@ fun STAndroidApp(
     onUpdatePrimary: () -> Unit,
     onUpdateDismiss: () -> Unit,
     onCancelUpdateDownload: () -> Unit,
-    showCustomSourceDownload: Boolean,
-    customSourceDownloadPercent: Int?,
-    customSourceStatus: String,
-    onCancelCustomSourceDownload: () -> Unit,
+    showCustomOperationCard: Boolean,
+    customOperationTitle: String,
+    customOperationProgressPercent: Int?,
+    customOperationDetails: String,
+    customOperationCancelable: Boolean,
+    onCancelCustomOperation: () -> Unit,
     onShowSettings: () -> Unit,
     onShowManageSt: () -> Unit
 ) {
@@ -211,13 +213,6 @@ fun STAndroidApp(
                             Text(text = "Edit Config")
                         }
                     }
-                    if (showNotificationPrompt) {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        NotificationPermissionCard(
-                            visible = true,
-                            onOpenSettings = onOpenNotificationSettings
-                        )
-                    }
                     if (showAutoCheckOptInPrompt) {
                         Spacer(modifier = Modifier.height(16.dp))
                         AutoCheckOptInCard(
@@ -242,6 +237,13 @@ fun STAndroidApp(
                             Text(text = "Manage ST")
                         }
                     }
+                    if (showNotificationPrompt) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        NotificationPermissionCard(
+                            visible = true,
+                            onOpenSettings = onOpenNotificationSettings
+                        )
+                    }
                     if (showUpdatePrompt) {
                         Spacer(modifier = Modifier.height(16.dp))
                         UpdatePromptCard(
@@ -256,13 +258,15 @@ fun STAndroidApp(
                             onCancelDownload = onCancelUpdateDownload
                         )
                     }
-                    if (showCustomSourceDownload) {
+                    if (showCustomOperationCard) {
                         Spacer(modifier = Modifier.height(16.dp))
                         CustomSourceDownloadCard(
                             visible = true,
-                            details = customSourceStatus,
-                            downloadProgressPercent = customSourceDownloadPercent,
-                            onCancelDownload = onCancelCustomSourceDownload
+                            title = customOperationTitle,
+                            details = customOperationDetails,
+                            downloadProgressPercent = customOperationProgressPercent,
+                            showCancel = customOperationCancelable,
+                            onCancelDownload = onCancelCustomOperation
                         )
                     }
                     Spacer(modifier = Modifier.height(8.dp))
@@ -359,10 +363,12 @@ private fun STAndroidAppPreview() {
         onUpdatePrimary = {},
         onUpdateDismiss = {},
         onCancelUpdateDownload = {},
-        showCustomSourceDownload = false,
-        customSourceDownloadPercent = null,
-        customSourceStatus = "",
-        onCancelCustomSourceDownload = {},
+        showCustomOperationCard = false,
+        customOperationTitle = "",
+        customOperationProgressPercent = null,
+        customOperationDetails = "",
+        customOperationCancelable = false,
+        onCancelCustomOperation = {},
         onShowSettings = {},
         onShowManageSt = {}
     )

@@ -68,10 +68,12 @@ fun ManageStScreen(
     onSelectRepoRef: (String) -> Unit,
     onDownloadAndInstallRef: () -> Unit,
     customInstallValidationMessage: String,
-    isDownloadingCustomSource: Boolean,
-    customSourceProgressPercent: Int?,
-    customSourceStatus: String,
-    onCancelCustomSourceDownload: () -> Unit,
+    showCustomOperationCard: Boolean,
+    customOperationTitle: String,
+    customOperationDetails: String,
+    customOperationProgressPercent: Int?,
+    customOperationCancelable: Boolean,
+    onCancelCustomOperation: () -> Unit,
     onLoadCustomZip: () -> Unit,
     onResetToDefault: () -> Unit,
     onRemoveUserData: () -> Unit
@@ -221,6 +223,36 @@ fun ManageStScreen(
                         }
                     }
                     Spacer(modifier = Modifier.height(20.dp))
+                    val installedStatus = if (isCustomInstalled) {
+                        val label = customInstalledLabel?.takeIf { it.isNotBlank() } ?: "custom version"
+                        "Currently installed: custom ($label)"
+                    } else {
+                        "Currently installed: default (bundled)"
+                    }
+                    Text(
+                        text = installedStatus,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    if (busyMessage.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "$busyMessage — please wait.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
+                    if (isCustomInstalled) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedButton(
+                            onClick = onResetToDefault,
+                            enabled = buttonsEnabled,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(text = "Reset to Bundled Version")
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(20.dp))
                     Text(
                         text = "Install from GitHub",
                         style = MaterialTheme.typography.titleSmall,
@@ -231,14 +263,14 @@ fun ManageStScreen(
                         value = customRepoInput,
                         onValueChange = onCustomRepoInputChanged,
                         singleLine = true,
-                        enabled = buttonsEnabled && !isDownloadingCustomSource,
+                        enabled = buttonsEnabled,
                         label = { Text("Repository (owner/repo)") },
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     Button(
                         onClick = onLoadRepoRefs,
-                        enabled = buttonsEnabled && !isLoadingRepoRefs && !isDownloadingCustomSource,
+                        enabled = buttonsEnabled && !isLoadingRepoRefs,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(text = if (isLoadingRepoRefs) "Loading refs..." else "Load Branches and Tags")
@@ -262,7 +294,7 @@ fun ManageStScreen(
                         for (option in featuredRefs) {
                             OutlinedButton(
                                 onClick = { onSelectRepoRef(option.key) },
-                                enabled = buttonsEnabled && !isDownloadingCustomSource,
+                                enabled = buttonsEnabled,
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ButtonDefaults.outlinedButtonColors(
                                     containerColor = if (option.key == selectedRefKey) {
@@ -283,7 +315,7 @@ fun ManageStScreen(
                         Box(modifier = Modifier.fillMaxWidth()) {
                             OutlinedButton(
                                 onClick = { showMoreRefsMenu.value = true },
-                                enabled = buttonsEnabled && !isDownloadingCustomSource,
+                                enabled = buttonsEnabled,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text(text = "More options (${allRefs.size})")
@@ -308,7 +340,7 @@ fun ManageStScreen(
                     Spacer(modifier = Modifier.height(12.dp))
                     Button(
                         onClick = onDownloadAndInstallRef,
-                        enabled = buttonsEnabled && selectedRef != null && !isDownloadingCustomSource,
+                        enabled = buttonsEnabled && selectedRef != null,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         val label = if (selectedRef == null) {
@@ -327,13 +359,15 @@ fun ManageStScreen(
                         )
                     }
 
-                    if (isDownloadingCustomSource) {
+                    if (showCustomOperationCard) {
                         Spacer(modifier = Modifier.height(12.dp))
                         CustomSourceDownloadCard(
                             visible = true,
-                            details = customSourceStatus,
-                            downloadProgressPercent = customSourceProgressPercent,
-                            onCancelDownload = onCancelCustomSourceDownload
+                            title = customOperationTitle,
+                            details = customOperationDetails,
+                            downloadProgressPercent = customOperationProgressPercent,
+                            showCancel = customOperationCancelable,
+                            onCancelDownload = onCancelCustomOperation
                         )
                     }
 
@@ -365,36 +399,7 @@ fun ManageStScreen(
 
                     Spacer(modifier = Modifier.height(20.dp))
                     HorizontalDivider()
-                    Spacer(modifier = Modifier.height(16.dp))
-                    val installedStatus = if (isCustomInstalled) {
-                        val label = customInstalledLabel?.takeIf { it.isNotBlank() } ?: "custom version"
-                        "Currently installed: custom ($label)"
-                    } else {
-                        "Currently installed: default (bundled)"
-                    }
-                    Text(
-                        text = installedStatus,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    if (busyMessage.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "$busyMessage — please wait.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.secondary
-                        )
-                    }
-                    if (isCustomInstalled) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        OutlinedButton(
-                            onClick = onResetToDefault,
-                            enabled = buttonsEnabled,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(text = "Reset to Bundled Version")
-                        }
-                    }
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
         }
@@ -495,10 +500,12 @@ private fun ManageStScreenPreview() {
         onSelectRepoRef = {},
         onDownloadAndInstallRef = {},
         customInstallValidationMessage = "",
-        isDownloadingCustomSource = false,
-        customSourceProgressPercent = null,
-        customSourceStatus = "",
-        onCancelCustomSourceDownload = {},
+        showCustomOperationCard = false,
+        customOperationTitle = "Installing Custom ST",
+        customOperationDetails = "Installing dependencies (npm install)…",
+        customOperationProgressPercent = null,
+        customOperationCancelable = false,
+        onCancelCustomOperation = {},
         onLoadCustomZip = {},
         onResetToDefault = {},
         onRemoveUserData = {}

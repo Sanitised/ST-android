@@ -166,7 +166,7 @@ fun NotificationPermissionCard(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Allow notifications so the server can keep running in the background with a foreground-service notification.",
+                text = "Allow notifications so SillyTavern server can keep running in the backgroundn. This permission is not used for anything else.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSecondaryContainer
             )
@@ -184,8 +184,10 @@ fun NotificationPermissionCard(
 @Composable
 fun CustomSourceDownloadCard(
     visible: Boolean,
+    title: String,
     details: String,
     downloadProgressPercent: Int?,
+    showCancel: Boolean,
     onCancelDownload: () -> Unit
 ) {
     if (!visible) return
@@ -197,7 +199,7 @@ fun CustomSourceDownloadCard(
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp)) {
             Text(
-                text = "Downloading custom ST source",
+                text = title,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -225,9 +227,11 @@ fun CustomSourceDownloadCard(
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
-            Spacer(modifier = Modifier.height(10.dp))
-            OutlinedButton(onClick = onCancelDownload) {
-                Text(text = "Cancel")
+            if (showCancel) {
+                Spacer(modifier = Modifier.height(10.dp))
+                OutlinedButton(onClick = onCancelDownload) {
+                    Text(text = "Cancel")
+                }
             }
         }
     }
