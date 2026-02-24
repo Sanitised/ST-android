@@ -89,6 +89,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         private const val TAG = "UpdateCheck"
         private const val UPDATE_PREFS_NAME = "updates"
         private const val PREF_AUTO_CHECK = "auto_check"
+        private const val PREF_AUTO_OPEN_BROWSER = "auto_open_browser"
         private const val PREF_CHANNEL = "channel"
         private const val PREF_FIRST_LAUNCH_MS = "first_launch_ms"
         private const val PREF_AUTO_OPTIN_PROMPT_SHOWN = "auto_optin_prompt_shown"
@@ -126,6 +127,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val customSourceStatus = mutableStateOf("")
     val autoCheckForUpdates = mutableStateOf(
         updatePrefs.getBoolean(PREF_AUTO_CHECK, false)
+    )
+    val autoOpenBrowserWhenReady = mutableStateOf(
+        updatePrefs.getBoolean(PREF_AUTO_OPEN_BROWSER, false)
     )
     val updateChannel = mutableStateOf(
         resolveInitialUpdateChannel()
@@ -454,6 +458,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setAutoCheckForUpdates(enabled: Boolean) {
         autoCheckForUpdates.value = enabled
         updatePrefs.edit().putBoolean(PREF_AUTO_CHECK, enabled).apply()
+    }
+
+    fun setAutoOpenBrowserWhenReady(enabled: Boolean) {
+        autoOpenBrowserWhenReady.value = enabled
+        updatePrefs.edit().putBoolean(PREF_AUTO_OPEN_BROWSER, enabled).apply()
     }
 
     fun setUpdateChannel(channel: UpdateChannel) {

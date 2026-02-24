@@ -50,6 +50,7 @@ fun STAndroidApp(
     onStart: () -> Unit,
     onStop: () -> Unit,
     onOpen: () -> Unit,
+    autoOpenBrowserWhenReady: Boolean,
     onShowLogs: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
     onEditConfig: () -> Unit,
@@ -81,6 +82,7 @@ fun STAndroidApp(
     MaterialTheme {
         val isBusy = busyMessage.isNotBlank()
         val readyState = remember { mutableStateOf(false) }
+        val wasCanOpen = remember { mutableStateOf(false) }
         val view = LocalView.current
         val darkTheme = isSystemInDarkTheme()
         val statusBarColor = MaterialTheme.colorScheme.background.toArgb()
@@ -107,6 +109,14 @@ fun STAndroidApp(
                 }
                 delay(1000)
             }
+        }
+        val canOpen = status.state == NodeState.RUNNING && readyState.value
+        LaunchedEffect(canOpen, autoOpenBrowserWhenReady) {
+            val justBecameActive = canOpen && !wasCanOpen.value
+            if (autoOpenBrowserWhenReady && justBecameActive) {
+                onOpen()
+            }
+            wasCanOpen.value = canOpen
         }
         Surface(modifier = Modifier.fillMaxSize()) {
             Column(
@@ -283,7 +293,6 @@ fun STAndroidApp(
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
-                val canOpen = status.state == NodeState.RUNNING && readyState.value
                 Button(
                     onClick = onOpen,
                     enabled = canOpen,
@@ -323,6 +332,7 @@ private fun STAndroidAppPreview() {
         onStart = {},
         onStop = {},
         onOpen = {},
+        autoOpenBrowserWhenReady = false,
         onShowLogs = {},
         onOpenNotificationSettings = {},
         onEditConfig = {},

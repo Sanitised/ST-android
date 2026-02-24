@@ -35,6 +35,8 @@ fun SettingsScreen(
     onBack: () -> Unit,
     autoCheckEnabled: Boolean,
     onAutoCheckChanged: (Boolean) -> Unit,
+    autoOpenBrowserEnabled: Boolean,
+    onAutoOpenBrowserChanged: (Boolean) -> Unit,
     channel: UpdateChannel,
     onChannelChanged: (UpdateChannel) -> Unit,
     onCheckNow: () -> Unit,
@@ -120,6 +122,30 @@ fun SettingsScreen(
                     Switch(
                         checked = autoCheckEnabled,
                         onCheckedChange = onAutoCheckChanged
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Open Browser Automatically",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "When the server is ready, open SillyTavern in your browser for you.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Switch(
+                        checked = autoOpenBrowserEnabled,
+                        onCheckedChange = onAutoOpenBrowserChanged
                     )
                 }
                 Spacer(modifier = Modifier.height(20.dp))
@@ -215,6 +241,8 @@ private fun SettingsScreenPreview() {
         onBack = {},
         autoCheckEnabled = false,
         onAutoCheckChanged = {},
+        autoOpenBrowserEnabled = false,
+        onAutoOpenBrowserChanged = {},
         channel = UpdateChannel.RELEASE,
         onChannelChanged = {},
         onCheckNow = {},
