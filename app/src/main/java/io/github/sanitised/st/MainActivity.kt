@@ -325,6 +325,7 @@ class MainActivity : ComponentActivity() {
                             customOperationDetails = viewModel.customOperationCardDetails.value,
                             customOperationProgressPercent = viewModel.customOperationCardProgressPercent.value,
                             customOperationCancelable = viewModel.customOperationCardCancelable.value,
+                            customOperationAnchor = viewModel.customOperationCardAnchor.value,
                             onCancelCustomOperation = { viewModel.cancelCustomSourceDownload() },
                             onLoadCustomZip = {
                                 customZipLauncher.launch(
@@ -385,8 +386,8 @@ class MainActivity : ComponentActivity() {
                             onCancelUpdateDownload = { viewModel.cancelUpdateDownload() },
                             showCustomOperationCard = viewModel.customOperationCardVisible.value,
                             customOperationTitle = viewModel.customOperationCardTitle.value,
-                            customOperationProgressPercent = viewModel.customOperationCardProgressPercent.value,
                             customOperationDetails = viewModel.customOperationCardDetails.value,
+                            customOperationProgressPercent = viewModel.customOperationCardProgressPercent.value,
                             customOperationCancelable = viewModel.customOperationCardCancelable.value,
                             onCancelCustomOperation = { viewModel.cancelCustomSourceDownload() },
                             onShowSettings = { showSettingsState.value = true },

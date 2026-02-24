@@ -73,6 +73,7 @@ fun ManageStScreen(
     customOperationDetails: String,
     customOperationProgressPercent: Int?,
     customOperationCancelable: Boolean,
+    customOperationAnchor: CustomOperationAnchor,
     onCancelCustomOperation: () -> Unit,
     onLoadCustomZip: () -> Unit,
     onResetToDefault: () -> Unit,
@@ -234,14 +235,6 @@ fun ManageStScreen(
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold
                     )
-                    if (busyMessage.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "$busyMessage — please wait.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.secondary
-                        )
-                    }
                     if (isCustomInstalled) {
                         Spacer(modifier = Modifier.height(10.dp))
                         OutlinedButton(
@@ -251,6 +244,17 @@ fun ManageStScreen(
                         ) {
                             Text(text = "Reset to Bundled Version")
                         }
+                    }
+                    if (showCustomOperationCard && customOperationAnchor == CustomOperationAnchor.RESET_TO_BUNDLED) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        CustomSourceDownloadCard(
+                            visible = true,
+                            title = customOperationTitle,
+                            details = customOperationDetails,
+                            downloadProgressPercent = customOperationProgressPercent,
+                            showCancel = customOperationCancelable,
+                            onCancelDownload = onCancelCustomOperation
+                        )
                     }
                     Spacer(modifier = Modifier.height(20.dp))
                     Text(
@@ -359,7 +363,7 @@ fun ManageStScreen(
                         )
                     }
 
-                    if (showCustomOperationCard) {
+                    if (showCustomOperationCard && customOperationAnchor == CustomOperationAnchor.GITHUB_INSTALL) {
                         Spacer(modifier = Modifier.height(12.dp))
                         CustomSourceDownloadCard(
                             visible = true,
@@ -387,14 +391,25 @@ fun ManageStScreen(
                     )
                     InstructionStep("2", "Choose the branch/tag/commit")
                     InstructionStep("3", "Click Code → Download ZIP")
-                    InstructionStep("4", "Tap Load ZIP below")
+                    InstructionStep("4", "Tap Install ST from ZIP below")
                     Spacer(modifier = Modifier.height(12.dp))
                     Button(
                         onClick = onLoadCustomZip,
                         enabled = buttonsEnabled,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(text = if (isCustomInstalled) "Load New ZIP" else "Load ZIP")
+                        Text(text = "Install ST from ZIP")
+                    }
+                    if (showCustomOperationCard && customOperationAnchor == CustomOperationAnchor.ZIP_INSTALL) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        CustomSourceDownloadCard(
+                            visible = true,
+                            title = customOperationTitle,
+                            details = customOperationDetails,
+                            downloadProgressPercent = customOperationProgressPercent,
+                            showCancel = customOperationCancelable,
+                            onCancelDownload = onCancelCustomOperation
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(20.dp))
@@ -505,6 +520,7 @@ private fun ManageStScreenPreview() {
         customOperationDetails = "Installing dependencies (npm install)…",
         customOperationProgressPercent = null,
         customOperationCancelable = false,
+        customOperationAnchor = CustomOperationAnchor.GITHUB_INSTALL,
         onCancelCustomOperation = {},
         onLoadCustomZip = {},
         onResetToDefault = {},

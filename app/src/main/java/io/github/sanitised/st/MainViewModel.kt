@@ -31,6 +31,12 @@ internal enum class BusyOperation {
     EXPORTING, IMPORTING, INSTALLING, RESETTING, REMOVING_DATA, DOWNLOADING_CUSTOM_SOURCE
 }
 
+enum class CustomOperationAnchor {
+    GITHUB_INSTALL,
+    ZIP_INSTALL,
+    RESET_TO_BUNDLED
+}
+
 enum class UpdateChannel(val storageValue: String) {
     RELEASE("release"),
     PRERELEASE("prerelease");
@@ -129,6 +135,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val customOperationCardDetails = mutableStateOf("")
     val customOperationCardProgressPercent = mutableStateOf<Int?>(null)
     val customOperationCardCancelable = mutableStateOf(false)
+    val customOperationCardAnchor = mutableStateOf(CustomOperationAnchor.GITHUB_INSTALL)
     val autoCheckForUpdates = mutableStateOf(
         updatePrefs.getBoolean(PREF_AUTO_CHECK, false)
     )
@@ -233,7 +240,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             title = "Installing Custom ST",
             details = "Preparing archive…",
             progressPercent = null,
-            cancelable = false
+            cancelable = false,
+            anchor = CustomOperationAnchor.ZIP_INSTALL
         )
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
@@ -264,7 +272,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             title = "Resetting to Bundled Version",
             details = "Preparing reset…",
             progressPercent = null,
-            cancelable = false
+            cancelable = false,
+            anchor = CustomOperationAnchor.RESET_TO_BUNDLED
         )
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
@@ -372,7 +381,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             title = "Installing Custom ST",
             details = "Downloading ${selectedRef.refType} ${selectedRef.refName}...",
             progressPercent = 0,
-            cancelable = true
+            cancelable = true,
+            anchor = CustomOperationAnchor.GITHUB_INSTALL
         )
 
         customSourceDownloadJob = viewModelScope.launch {
@@ -834,7 +844,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         title: String,
         details: String,
         progressPercent: Int?,
-        cancelable: Boolean
+        cancelable: Boolean,
+        anchor: CustomOperationAnchor
     ) {
         customOperationCardToken += 1
         customOperationCardVisible.value = true
@@ -842,6 +853,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         customOperationCardDetails.value = details
         customOperationCardProgressPercent.value = progressPercent
         customOperationCardCancelable.value = cancelable
+        customOperationCardAnchor.value = anchor
     }
 
     private fun updateCustomOperationCard(
