@@ -1,6 +1,6 @@
 # ST-android
 
-SillyTavern app for Android. Works on device with zero setup. Supports Android 8.0+ and arm64.
+SillyTavern runner for Android. Works on device with zero setup. Supports Android 8.0+ and arm64.
 
 <img src="pics/ST-android-screenshot.png" alt="Screenshot" width="300">
 
@@ -15,7 +15,6 @@ It is intended primarily for basic on-device chatting; advanced workflows (for e
 - All chats, characters, settings stay local unless you decide to export them manually and share with others.
 - Bundles SillyTavern source code without modifications.
 - Bundles Node.js with minimal patches required to run on Android.
-- The codebase is intentionally small and easy to review manually or with a coding agent.
 - Release APKs are built in the pipeline and published automatically through immutable releases.
 
 ## Importing data from SillyTavern on Termux/PC
