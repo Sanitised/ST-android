@@ -16,6 +16,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
@@ -40,9 +41,9 @@ fun UpdatePromptCard(
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp)) {
             val headline = when {
-                isDownloading -> "Downloading update $versionLabel"
-                isReadyToInstall -> "New update $versionLabel is ready."
-                else -> "New update $versionLabel is available."
+                isDownloading -> stringResource(R.string.update_headline_downloading, versionLabel)
+                isReadyToInstall -> stringResource(R.string.update_headline_ready, versionLabel)
+                else -> stringResource(R.string.update_headline_available, versionLabel)
             }
             Text(
                 text = headline,
@@ -69,14 +70,14 @@ fun UpdatePromptCard(
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        text = "$downloadProgressPercent%",
+                        text = stringResource(R.string.percent_value, downloadProgressPercent),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 }
                 Spacer(modifier = Modifier.height(10.dp))
                 OutlinedButton(onClick = onCancelDownload) {
-                    Text(text = "Cancel")
+                    Text(text = stringResource(R.string.cancel))
                 }
             } else {
                 Row(modifier = Modifier.fillMaxWidth()) {
@@ -84,14 +85,20 @@ fun UpdatePromptCard(
                         onClick = onPrimary,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text(text = if (isReadyToInstall) "Install now" else "Install")
+                        Text(
+                            text = if (isReadyToInstall) {
+                                stringResource(R.string.install_now)
+                            } else {
+                                stringResource(R.string.install)
+                            }
+                        )
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     OutlinedButton(
                         onClick = onDismiss,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text(text = "Dismiss")
+                        Text(text = stringResource(R.string.dismiss))
                     }
                 }
             }
@@ -114,14 +121,14 @@ fun AutoCheckOptInCard(
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp)) {
             Text(
-                text = "Enable automatic update checks?",
+                text = stringResource(R.string.auto_check_opt_in_title),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSecondaryContainer
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "We can check on app launch, no more than once per day.",
+                text = stringResource(R.string.auto_check_opt_in_body),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSecondaryContainer
             )
@@ -131,14 +138,14 @@ fun AutoCheckOptInCard(
                     onClick = onEnable,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text(text = "Enable")
+                    Text(text = stringResource(R.string.enable))
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 OutlinedButton(
                     onClick = onLater,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text(text = "Later")
+                    Text(text = stringResource(R.string.later))
                 }
             }
         }
@@ -159,14 +166,14 @@ fun NotificationPermissionCard(
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp)) {
             Text(
-                text = "Notification access needed",
+                text = stringResource(R.string.notification_access_title),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSecondaryContainer
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Allow notifications so SillyTavern server can keep running in the background. This permission is not used for anything else.",
+                text = stringResource(R.string.notification_access_body),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSecondaryContainer
             )
@@ -175,7 +182,7 @@ fun NotificationPermissionCard(
                 onClick = onOpenSettings,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(text = "Notification Settings")
+                Text(text = stringResource(R.string.notification_settings))
             }
         }
     }
@@ -222,7 +229,7 @@ fun CustomSourceDownloadCard(
                 )
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(
-                    text = "$downloadProgressPercent%",
+                    text = stringResource(R.string.percent_value, downloadProgressPercent),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
@@ -230,7 +237,7 @@ fun CustomSourceDownloadCard(
             if (showCancel) {
                 Spacer(modifier = Modifier.height(10.dp))
                 OutlinedButton(onClick = onCancelDownload) {
-                    Text(text = "Cancel")
+                    Text(text = stringResource(R.string.cancel))
                 }
             }
         }

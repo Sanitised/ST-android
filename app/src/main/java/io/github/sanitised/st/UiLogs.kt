@@ -10,14 +10,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -27,6 +21,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -49,35 +44,32 @@ fun LogsScreen(
                 .statusBarsPadding()
                 .navigationBarsPadding()
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 4.dp, end = 16.dp, top = 4.dp, bottom = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back"
-                    )
-                }
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "Logs",
-                    style = MaterialTheme.typography.titleLarge
-                )
-            }
-            HorizontalDivider()
+            SecondaryTopAppBar(
+                title = stringResource(R.string.logs_title),
+                onBack = onBack
+            )
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
-                LogSection(label = "stdout", text = stdoutLog, modifier = Modifier.weight(0.45f))
+                LogSection(
+                    label = stringResource(R.string.logs_stdout_label),
+                    text = stdoutLog,
+                    modifier = Modifier.weight(0.45f)
+                )
                 Spacer(modifier = Modifier.height(8.dp))
-                LogSection(label = "stderr", text = stderrLog, modifier = Modifier.weight(0.35f))
+                LogSection(
+                    label = stringResource(R.string.logs_stderr_label),
+                    text = stderrLog,
+                    modifier = Modifier.weight(0.35f)
+                )
                 Spacer(modifier = Modifier.height(8.dp))
-                LogSection(label = "service", text = serviceLog, modifier = Modifier.weight(0.20f))
+                LogSection(
+                    label = stringResource(R.string.logs_service_label),
+                    text = serviceLog,
+                    modifier = Modifier.weight(0.20f)
+                )
             }
         }
     }
@@ -118,7 +110,7 @@ private fun LogSection(
         ) {
             Box(modifier = Modifier.fillMaxSize().verticalScrollbar(scrollState, scrollbarColor)) {
                 Text(
-                    text = if (text.isNotEmpty()) text else "(empty)",
+                    text = if (text.isNotEmpty()) text else stringResource(R.string.logs_empty),
                     modifier = Modifier
                         .fillMaxWidth()
                         .verticalScroll(scrollState)
@@ -142,7 +134,7 @@ private fun CopyButton(text: String) {
         onClick = { clipboard.setText(AnnotatedString(text)) },
         enabled = text.isNotEmpty()
     ) {
-        Text(text = "Copy", style = MaterialTheme.typography.labelMedium)
+        Text(text = stringResource(R.string.copy), style = MaterialTheme.typography.labelMedium)
     }
 }
 

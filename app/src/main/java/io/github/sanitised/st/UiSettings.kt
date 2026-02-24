@@ -14,12 +14,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
@@ -28,6 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -61,25 +57,10 @@ fun SettingsScreen(
                 .statusBarsPadding()
                 .navigationBarsPadding()
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 4.dp, end = 16.dp, top = 4.dp, bottom = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back"
-                    )
-                }
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "Settings",
-                    style = MaterialTheme.typography.titleLarge
-                )
-            }
-            HorizontalDivider()
+            SecondaryTopAppBar(
+                title = stringResource(R.string.settings_title),
+                onBack = onBack
+            )
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -87,7 +68,7 @@ fun SettingsScreen(
                     .padding(horizontal = 20.dp, vertical = 20.dp)
             ) {
                 Text(
-                    text = "Checks for new app releases on GitHub.",
+                    text = stringResource(R.string.settings_update_description),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -112,13 +93,13 @@ fun SettingsScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Automatically Check for Updates",
+                            text = stringResource(R.string.settings_auto_check_title),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Checks on app startup, no more than once per day.",
+                            text = stringResource(R.string.settings_auto_check_subtitle),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -136,13 +117,13 @@ fun SettingsScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Open Browser Automatically",
+                            text = stringResource(R.string.settings_auto_open_title),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "When the server is ready, open SillyTavern in your browser for you.",
+                            text = stringResource(R.string.settings_auto_open_subtitle),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -155,7 +136,7 @@ fun SettingsScreen(
                 }
                 Spacer(modifier = Modifier.height(20.dp))
                 Text(
-                    text = "Update Channel",
+                    text = stringResource(R.string.settings_update_channel_title),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -179,11 +160,11 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Column {
                             Text(
-                                text = "Release",
+                                text = stringResource(R.string.settings_channel_release_label),
                                 style = MaterialTheme.typography.bodyLarge
                             )
                             Text(
-                                text = "Stable releases only",
+                                text = stringResource(R.string.settings_channel_release_subtitle),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -207,11 +188,11 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Column {
                             Text(
-                                text = "Pre-release",
+                                text = stringResource(R.string.settings_channel_prerelease_label),
                                 style = MaterialTheme.typography.bodyLarge
                             )
                             Text(
-                                text = "Includes beta/rc builds",
+                                text = stringResource(R.string.settings_channel_prerelease_subtitle),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -224,7 +205,13 @@ fun SettingsScreen(
                     enabled = !isChecking,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(text = if (isChecking) "Checking..." else "Check for Updates Now")
+                    Text(
+                        text = if (isChecking) {
+                            stringResource(R.string.settings_checking)
+                        } else {
+                            stringResource(R.string.settings_check_now)
+                        }
+                    )
                 }
             }
         }

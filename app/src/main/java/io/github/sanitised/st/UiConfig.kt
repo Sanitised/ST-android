@@ -3,7 +3,6 @@ package io.github.sanitised.st
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,16 +11,10 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -38,7 +31,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
@@ -66,6 +61,7 @@ fun ConfigScreen(
     val hasUserEdits = remember { mutableStateOf(false) }
     val editorScrollState = rememberScrollState()
     val focusRequester = remember { FocusRequester() }
+    val context = LocalContext.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
     val requestBack = {
@@ -105,29 +101,15 @@ fun ConfigScreen(
                 .navigationBarsPadding()
                 .imePadding()
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 4.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = requestBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back"
-                    )
+            SecondaryTopAppBar(
+                title = stringResource(R.string.config_title),
+                onBack = requestBack,
+                actions = {
+                    TextButton(onClick = onOpenDocs) {
+                        Text(text = stringResource(R.string.docs))
+                    }
                 }
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "Edit Config",
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.weight(1f)
-                )
-                TextButton(onClick = onOpenDocs) {
-                    Text(text = "Docs")
-                }
-            }
-            HorizontalDivider()
+            )
 
             val canEditEffective = canEdit && !missingState.value
             Column(
@@ -138,14 +120,14 @@ fun ConfigScreen(
             ) {
                 if (missingState.value) {
                     Text(
-                        text = "Config is missing. Start SillyTavern once to generate a default config.",
+                        text = stringResource(R.string.config_missing),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                 } else if (!canEdit) {
                     Text(
-                        text = "Stop the server to edit the config.",
+                        text = stringResource(R.string.config_stop_server),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -173,13 +155,13 @@ fun ConfigScreen(
                                     .focusRequester(focusRequester),
                                 enabled = canEditEffective,
                                 textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                label = { Text(text = "config.yaml") },
+                                label = { Text(text = stringResource(R.string.config_file_name)) },
                                 maxLines = Int.MAX_VALUE
                             )
                         }
                     } else {
                         Text(
-                            text = "Loading...",
+                            text = stringResource(R.string.loading),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(4.dp)
@@ -199,10 +181,13 @@ fun ConfigScreen(
                                 isSavingState.value = false
                                 if (result.isSuccess) {
                                     originalState.value = textState.value.text
-                                    onShowMessage("Config saved.")
+                                    onShowMessage(context.getString(R.string.config_saved))
                                 } else {
                                     onShowMessage(
-                                        "Save failed: ${result.exceptionOrNull()?.message ?: "unknown error"}"
+                                        context.getString(
+                                            R.string.config_save_failed,
+                                            result.exceptionOrNull()?.message ?: context.getString(R.string.unknown_error)
+                                        )
                                     )
                                 }
                             }
@@ -211,7 +196,7 @@ fun ConfigScreen(
                     enabled = canEditEffective && !isSavingState.value,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(text = if (isSavingState.value) "Saving..." else "Save")
+                    Text(text = if (isSavingState.value) stringResource(R.string.saving) else stringResource(R.string.save))
                 }
             }
         }
@@ -220,19 +205,19 @@ fun ConfigScreen(
     if (showDiscardDialog.value) {
         AlertDialog(
             onDismissRequest = { showDiscardDialog.value = false },
-            title = { Text(text = "Discard changes?") },
-            text = { Text(text = "You have unsaved changes. If you go back, they will be lost.") },
+            title = { Text(text = stringResource(R.string.config_discard_title)) },
+            text = { Text(text = stringResource(R.string.config_discard_body)) },
             confirmButton = {
                 TextButton(onClick = {
                     showDiscardDialog.value = false
                     onBack()
                 }) {
-                    Text(text = "Discard")
+                    Text(text = stringResource(R.string.discard))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDiscardDialog.value = false }) {
-                    Text(text = "Cancel")
+                    Text(text = stringResource(R.string.cancel))
                 }
             }
         )

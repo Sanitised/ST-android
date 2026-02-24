@@ -1,7 +1,6 @@
 package io.github.sanitised.st
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,13 +10,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -25,9 +18,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
@@ -47,22 +40,10 @@ fun LegalScreen(
                 .statusBarsPadding()
                 .navigationBarsPadding()
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 4.dp, end = 16.dp, top = 4.dp, bottom = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back"
-                    )
-                }
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(text = "Legal & Licenses", style = MaterialTheme.typography.titleLarge)
-            }
-            HorizontalDivider()
+            SecondaryTopAppBar(
+                title = stringResource(R.string.legal_title),
+                onBack = onBack
+            )
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -70,25 +51,25 @@ fun LegalScreen(
                     .verticalScroll(rememberScrollState())
             ) {
                 Text(
-                    text = "This app bundles SillyTavern and Node.js.",
+                    text = stringResource(R.string.legal_description),
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(text = "Links", style = MaterialTheme.typography.titleMedium)
+                Text(text = stringResource(R.string.legal_links_title), style = MaterialTheme.typography.titleMedium)
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(onClick = { onOpenUrl("https://github.com/Sanitised/ST-android") }) {
-                    Text(text = "ST-android Repository")
+                    Text(text = stringResource(R.string.legal_link_st_android))
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(onClick = { onOpenUrl("https://github.com/SillyTavern/SillyTavern") }) {
-                    Text(text = "SillyTavern Repository")
+                    Text(text = stringResource(R.string.legal_link_sillytavern))
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(onClick = { onOpenUrl("https://github.com/nodejs/node") }) {
-                    Text(text = "Node.js Repository")
+                    Text(text = stringResource(R.string.legal_link_node))
                 }
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(text = "Licenses", style = MaterialTheme.typography.titleMedium)
+                Text(text = stringResource(R.string.legal_licenses_title), style = MaterialTheme.typography.titleMedium)
                 Spacer(modifier = Modifier.height(8.dp))
                 for (doc in legalDocs) {
                     Button(onClick = { onOpenLicense(doc) }) {
@@ -111,12 +92,17 @@ fun LicenseTextScreen(
     doc: LegalDoc
 ) {
     val context = LocalContext.current
-    val textState = remember { mutableStateOf("Loading...") }
+    val textState = remember { mutableStateOf(context.getString(R.string.loading)) }
     LaunchedEffect(doc.assetPath) {
         val text = withContext(Dispatchers.IO) {
             runCatching {
                 context.assets.open(doc.assetPath).bufferedReader().use { it.readText() }
-            }.getOrElse { "Failed to load license: ${it.message ?: "unknown error"}" }
+            }.getOrElse {
+                context.getString(
+                    R.string.legal_license_load_failed,
+                    it.message ?: context.getString(R.string.unknown_error)
+                )
+            }
         }
         textState.value = text
     }
@@ -127,21 +113,10 @@ fun LicenseTextScreen(
                 .statusBarsPadding()
                 .navigationBarsPadding()
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 4.dp, end = 16.dp, top = 4.dp, bottom = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back"
-                    )
-                }
-                Text(text = doc.title, style = MaterialTheme.typography.titleLarge)
-            }
-            HorizontalDivider()
+            SecondaryTopAppBar(
+                title = doc.title,
+                onBack = onBack
+            )
             Text(
                 text = textState.value,
                 modifier = Modifier

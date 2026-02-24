@@ -31,6 +31,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -84,16 +85,16 @@ class MainActivity : ComponentActivity() {
         maybeRequestNotificationPermission()
         val versionLabel = runCatching {
             val info = packageManager.getPackageInfo(packageName, 0)
-            info.versionName ?: "?"
-        }.getOrElse { "unknown" }
+            info.versionName ?: getString(R.string.unknown_short)
+        }.getOrElse { getString(R.string.unknown) }
         val bundledInfo = NodePayload(this).readManifestInfo()
         val stLabel = bundledInfo?.let {
             when {
-                !it.stVersion.isNullOrBlank() -> "SillyTavern ${it.stVersion}"
-                !it.stCommit.isNullOrBlank() -> "SillyTavern ${it.stCommit}"
-                else -> "SillyTavern unknown"
+                !it.stVersion.isNullOrBlank() -> getString(R.string.sillytavern_label, it.stVersion)
+                !it.stCommit.isNullOrBlank() -> getString(R.string.sillytavern_label, it.stCommit)
+                else -> getString(R.string.sillytavern_unknown)
             }
-        } ?: "SillyTavern unknown"
+        } ?: getString(R.string.sillytavern_unknown)
         val nodeLabel = bundledInfo?.let {
             val nodeValue = when {
                 !it.nodeTag.isNullOrBlank() -> it.nodeTag
@@ -101,8 +102,8 @@ class MainActivity : ComponentActivity() {
                 !it.nodeCommit.isNullOrBlank() -> it.nodeCommit
                 else -> null
             }
-            if (nodeValue.isNullOrBlank()) "Node unknown" else "Node $nodeValue"
-        } ?: "Node unknown"
+            if (nodeValue.isNullOrBlank()) getString(R.string.node_unknown) else getString(R.string.node_label, nodeValue)
+        } ?: getString(R.string.node_unknown)
         val symlinkSupported = isSymlinkSupported()
         setContent {
             val viewModel: MainViewModel = viewModel()
@@ -181,21 +182,21 @@ class MainActivity : ComponentActivity() {
             val legalDocs = remember {
                 listOf(
                     LegalDoc(
-                        title = "App license (AGPL-3.0)",
+                        title = getString(R.string.legal_doc_app_license_title),
                         assetPath = "legal/sillytavern_AGPL-3.0.txt",
-                        description = "Applies to this app and SillyTavern."
+                        description = getString(R.string.legal_doc_app_license_description)
                     ),
                     LegalDoc(
-                        title = "Node.js license (MIT)",
+                        title = getString(R.string.legal_doc_node_license_title),
                         assetPath = "legal/node_MIT.txt",
-                        description = "Includes Termux-derived Node patches."
+                        description = getString(R.string.legal_doc_node_license_description)
                     ),
                     LegalDoc(
-                        title = "AndroidX / Compose / Material / Kotlin license (Apache-2.0)",
+                        title = getString(R.string.legal_doc_android_license_title),
                         assetPath = "legal/apache-2.0.txt",
                     ),
                     LegalDoc(
-                        title = "SillyTavern Dependencies and Licenses (package-lock.json)",
+                        title = getString(R.string.legal_doc_st_dependencies_title),
                         assetPath = "legal/sillytavern_package-lock.json"
                     )
                 )
@@ -374,9 +375,9 @@ class MainActivity : ComponentActivity() {
                             stLabel = if (viewModel.isCustomInstalled.value) {
                                 val customLabel = viewModel.customInstallLabel.value
                                 if (customLabel.isNullOrBlank()) {
-                                    "SillyTavern (custom version)"
+                                    getString(R.string.sillytavern_custom_version)
                                 } else {
-                                    "SillyTavern ($customLabel)"
+                                    getString(R.string.sillytavern_custom_with_label, customLabel)
                                 }
                             } else stLabel,
                             nodeLabel = nodeLabel,
@@ -420,12 +421,10 @@ class MainActivity : ComponentActivity() {
                     PendingDialog.ResetToDefault -> {
                         androidx.compose.material3.AlertDialog(
                             onDismissRequest = { pendingDialogState.value = null },
-                            title = { Text(text = "Reset to default?") },
+                            title = { Text(text = stringResource(R.string.dialog_reset_title)) },
                             text = {
                                 Text(
-                                    text = "This will reinstall the SillyTavern version bundled " +
-                                            "with the app. Your data (chats, characters, settings) " +
-                                            "will not be affected."
+                                    text = stringResource(R.string.dialog_reset_body)
                                 )
                             },
                             confirmButton = {
@@ -433,12 +432,12 @@ class MainActivity : ComponentActivity() {
                                     pendingDialogState.value = null
                                     viewModel.resetToDefault()
                                 }) {
-                                    Text(text = "Reset")
+                                    Text(text = stringResource(R.string.reset))
                                 }
                             },
                             dismissButton = {
                                 Button(onClick = { pendingDialogState.value = null }) {
-                                    Text(text = "Cancel")
+                                    Text(text = stringResource(R.string.cancel))
                                 }
                             }
                         )
@@ -447,12 +446,10 @@ class MainActivity : ComponentActivity() {
                     PendingDialog.RemoveUserData -> {
                         androidx.compose.material3.AlertDialog(
                             onDismissRequest = { pendingDialogState.value = null },
-                            title = { Text(text = "Remove all user data?") },
+                            title = { Text(text = stringResource(R.string.dialog_remove_data_title)) },
                             text = {
                                 Text(
-                                    text = "This will permanently delete ALL your current chats, characters, " +
-                                            "presets, worlds, settings, and any other data stored by the app. " +
-                                            "This cannot be undone. Export a backup first if you want to keep anything."
+                                    text = stringResource(R.string.dialog_remove_data_body)
                                 )
                             },
                             confirmButton = {
@@ -460,12 +457,12 @@ class MainActivity : ComponentActivity() {
                                     pendingDialogState.value = null
                                     viewModel.removeUserData()
                                 }) {
-                                    Text(text = "Import")
+                                    Text(text = stringResource(R.string.remove))
                                 }
                             },
                             dismissButton = {
                                 Button(onClick = { pendingDialogState.value = null }) {
-                                    Text(text = "Cancel")
+                                    Text(text = stringResource(R.string.cancel))
                                 }
                             }
                         )
@@ -474,10 +471,10 @@ class MainActivity : ComponentActivity() {
                     is PendingDialog.ConfirmImport -> {
                         androidx.compose.material3.AlertDialog(
                             onDismissRequest = { pendingDialogState.value = null },
-                            title = { Text(text = "Import backup?") },
+                            title = { Text(text = stringResource(R.string.dialog_import_title)) },
                             text = {
                                 Text(
-                                    text = "YOUR EXISTING DATA WILL BE OVERWRITTEN. "
+                                    text = stringResource(R.string.dialog_import_body)
                                 )
                             },
                             confirmButton = {
@@ -486,12 +483,12 @@ class MainActivity : ComponentActivity() {
                                     pendingDialogState.value = null
                                     viewModel.import(importUri)
                                 }) {
-                                    Text(text = "Import")
+                                    Text(text = stringResource(R.string.import_action))
                                 }
                             },
                             dismissButton = {
                                 Button(onClick = { pendingDialogState.value = null }) {
-                                    Text(text = "Cancel")
+                                    Text(text = stringResource(R.string.cancel))
                                 }
                             }
                         )

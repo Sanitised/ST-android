@@ -32,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -145,18 +146,18 @@ fun STAndroidApp(
                 ) {
                     Spacer(modifier = Modifier.height(72.dp))
                     Text(
-                        text = "SillyTavern",
+                        text = stringResource(R.string.app_title),
                         style = MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        text = "for Android",
+                        text = stringResource(R.string.app_subtitle),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "v$versionLabel",
+                        text = stringResource(R.string.app_version_label, versionLabel),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -179,7 +180,7 @@ fun STAndroidApp(
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Licenses",
+                            text = stringResource(R.string.licenses),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -193,7 +194,7 @@ fun STAndroidApp(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                text = "Symlinks are not supported on this device. The app may not work correctly or may lose data on update.",
+                                text = stringResource(R.string.symlink_not_supported),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onErrorContainer,
                                 modifier = Modifier.padding(12.dp)
@@ -206,7 +207,7 @@ fun STAndroidApp(
                             onClick = onShowLogs,
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text(text = "Logs")
+                            Text(text = stringResource(R.string.logs_title))
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         OutlinedButton(
@@ -214,7 +215,7 @@ fun STAndroidApp(
                             enabled = !isBusy && (status.state == NodeState.STOPPED || status.state == NodeState.ERROR),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text(text = "Edit Config")
+                            Text(text = stringResource(R.string.config_title))
                         }
                     }
                     if (showAutoCheckOptInPrompt) {
@@ -231,14 +232,14 @@ fun STAndroidApp(
                             onClick = onShowSettings,
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text(text = "Settings")
+                            Text(text = stringResource(R.string.settings_title))
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         OutlinedButton(
                             onClick = onShowManageSt,
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text(text = "Manage ST")
+                            Text(text = stringResource(R.string.manage_st_title))
                         }
                     }
                     if (showNotificationPrompt) {
@@ -303,7 +304,7 @@ fun STAndroidApp(
                         enabled = !isBusy && (status.state == NodeState.STOPPED || status.state == NodeState.ERROR),
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text(text = "Start")
+                        Text(text = stringResource(R.string.start))
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Button(
@@ -311,7 +312,7 @@ fun STAndroidApp(
                         enabled = status.state == NodeState.RUNNING || status.state == NodeState.STARTING,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text(text = "Stop")
+                        Text(text = stringResource(R.string.stop))
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
@@ -322,9 +323,9 @@ fun STAndroidApp(
                 ) {
                     Text(
                         text = if (status.state == NodeState.RUNNING && !readyState.value) {
-                            "Waiting for server..."
+                            stringResource(R.string.waiting_for_server)
                         } else {
-                            "Open in Browser"
+                            stringResource(R.string.open_in_browser)
                         }
                     )
                 }

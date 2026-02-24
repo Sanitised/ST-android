@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -24,8 +22,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -38,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -95,25 +92,10 @@ fun ManageStScreen(
                 .statusBarsPadding()
                 .navigationBarsPadding()
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 4.dp, end = 16.dp, top = 4.dp, bottom = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back"
-                    )
-                }
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "Manage ST",
-                    style = MaterialTheme.typography.titleLarge
-                )
-            }
-            HorizontalDivider()
+            SecondaryTopAppBar(
+                title = stringResource(R.string.manage_st_title),
+                onBack = onBack
+            )
             val scrollState = rememberScrollState()
             val scrollbarColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
             Box(modifier = Modifier.fillMaxSize().verticalScrollbar(scrollState, scrollbarColor)) {
@@ -125,13 +107,13 @@ fun ManageStScreen(
                 ) {
                     val buttonsEnabled = !serverRunning && busyMessage.isBlank()
                     Text(
-                        text = "Data Backup",
+                        text = stringResource(R.string.manage_data_backup_title),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Export your current data or import a backup archive.",
+                        text = stringResource(R.string.manage_data_backup_description),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -142,7 +124,7 @@ fun ManageStScreen(
                             enabled = buttonsEnabled,
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text(text = "Export Data")
+                            Text(text = stringResource(R.string.manage_export_data))
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         OutlinedButton(
@@ -150,7 +132,7 @@ fun ManageStScreen(
                             enabled = buttonsEnabled,
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text(text = "Import Data")
+                            Text(text = stringResource(R.string.manage_import_data))
                         }
                     }
                     if (showBackupOperationCard &&
@@ -171,14 +153,13 @@ fun ManageStScreen(
                     HorizontalDivider()
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = "User Data",
+                        text = stringResource(R.string.manage_user_data_title),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Permanently delete all chats, characters, presets, worlds, " +
-                                "settings, and other user data stored by the app.",
+                        text = stringResource(R.string.manage_user_data_description),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -192,19 +173,19 @@ fun ManageStScreen(
                         ),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(text = "Remove All User Data")
+                        Text(text = stringResource(R.string.manage_remove_all_user_data))
                     }
                     Spacer(modifier = Modifier.height(24.dp))
                     HorizontalDivider()
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = "Custom SillyTavern Version",
+                        text = stringResource(R.string.manage_custom_st_title),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Replace the bundled SillyTavern with a version you provide.",
+                        text = stringResource(R.string.manage_custom_st_description),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -217,38 +198,39 @@ fun ManageStScreen(
                     ) {
                         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
                             Text(
-                                text = "⚠  Use at your own risk",
+                                text = stringResource(R.string.manage_warning_title),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )
                             Spacer(modifier = Modifier.height(10.dp))
                             Text(
-                                text = "Custom installs replace bundled code. Only install from repos you trust.",
+                                text = stringResource(R.string.manage_warning_body),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             WarningBullet(
-                                text = "Back up your data first — use Export Data above.",
+                                text = stringResource(R.string.manage_warning_backup),
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )
                             WarningBullet(
-                                text = "Untrusted code can steal keys, chats, and characters, as well as attack other devices on your network",
+                                text = stringResource(R.string.manage_warning_untrusted_code),
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )
                             WarningBullet(
-                                text = "Downgrades/forks can break data.",
+                                text = stringResource(R.string.manage_warning_downgrade),
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )
                         }
                     }
                     Spacer(modifier = Modifier.height(20.dp))
                     val installedStatus = if (isCustomInstalled) {
-                        val label = customInstalledLabel?.takeIf { it.isNotBlank() } ?: "custom version"
-                        "Currently installed: custom ($label)"
+                        val label = customInstalledLabel?.takeIf { it.isNotBlank() }
+                            ?: stringResource(R.string.manage_custom_version_default_label)
+                        stringResource(R.string.manage_current_installed_custom, label)
                     } else {
-                        "Currently installed: default (bundled)"
+                        stringResource(R.string.manage_current_installed_bundled)
                     }
                     Text(
                         text = installedStatus,
@@ -262,7 +244,7 @@ fun ManageStScreen(
                             enabled = buttonsEnabled,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(text = "Reset to Bundled Version")
+                            Text(text = stringResource(R.string.manage_reset_to_bundled))
                         }
                     }
                     if (showCustomOperationCard && customOperationAnchor == CustomOperationAnchor.RESET_TO_BUNDLED) {
@@ -278,7 +260,7 @@ fun ManageStScreen(
                     }
                     Spacer(modifier = Modifier.height(20.dp))
                     Text(
-                        text = "Install from GitHub",
+                        text = stringResource(R.string.manage_install_from_github),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -288,7 +270,7 @@ fun ManageStScreen(
                         onValueChange = onCustomRepoInputChanged,
                         singleLine = true,
                         enabled = buttonsEnabled,
-                        label = { Text("Repository (owner/repo)") },
+                        label = { Text(stringResource(R.string.manage_repo_label)) },
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(10.dp))
@@ -297,7 +279,13 @@ fun ManageStScreen(
                         enabled = buttonsEnabled && !isLoadingRepoRefs,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(text = if (isLoadingRepoRefs) "Loading refs..." else "Load Branches and Tags")
+                        Text(
+                            text = if (isLoadingRepoRefs) {
+                                stringResource(R.string.manage_loading_refs)
+                            } else {
+                                stringResource(R.string.manage_load_refs)
+                            }
+                        )
                     }
                     if (customRepoValidationMessage.isNotBlank()) {
                         Spacer(modifier = Modifier.height(8.dp))
@@ -310,7 +298,7 @@ fun ManageStScreen(
                     if (featuredRefs.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(14.dp))
                         Text(
-                            text = "Quick picks",
+                            text = stringResource(R.string.manage_quick_picks),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -342,7 +330,7 @@ fun ManageStScreen(
                                 enabled = buttonsEnabled,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text(text = "More options (${allRefs.size})")
+                                Text(text = stringResource(R.string.manage_more_options_count, allRefs.size))
                             }
                             DropdownMenu(
                                 expanded = showMoreRefsMenu.value,
@@ -368,9 +356,13 @@ fun ManageStScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         val label = if (selectedRef == null) {
-                            "Install Selected Version"
+                            stringResource(R.string.manage_install_selected_version)
                         } else {
-                            "Install Selected Version (${selectedRef.refType}: ${selectedRef.refName})"
+                            stringResource(
+                                R.string.manage_install_selected_version_with_ref,
+                                selectedRef.refType,
+                                selectedRef.refName
+                            )
                         }
                         Text(text = label)
                     }
@@ -399,26 +391,26 @@ fun ManageStScreen(
                     HorizontalDivider()
                     Spacer(modifier = Modifier.height(14.dp))
                     Text(
-                        text = "Or install from ZIP",
+                        text = stringResource(R.string.manage_or_install_from_zip),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     InstructionStep(
                         "1",
-                        "Open the repository page on GitHub",
+                        stringResource(R.string.manage_zip_step_1),
                         url = "https://github.com/SillyTavern/SillyTavern"
                     )
-                    InstructionStep("2", "Choose the branch/tag/commit")
-                    InstructionStep("3", "Click Code → Download ZIP")
-                    InstructionStep("4", "Tap Install ST from ZIP below")
+                    InstructionStep("2", stringResource(R.string.manage_zip_step_2))
+                    InstructionStep("3", stringResource(R.string.manage_zip_step_3))
+                    InstructionStep("4", stringResource(R.string.manage_zip_step_4))
                     Spacer(modifier = Modifier.height(12.dp))
                     Button(
                         onClick = onLoadCustomZip,
                         enabled = buttonsEnabled,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(text = "Install ST from ZIP")
+                        Text(text = stringResource(R.string.manage_install_from_zip_button))
                     }
                     if (showCustomOperationCard && customOperationAnchor == CustomOperationAnchor.ZIP_INSTALL) {
                         Spacer(modifier = Modifier.height(12.dp))
