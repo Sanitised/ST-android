@@ -3,6 +3,7 @@ package io.github.sanitised.st
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,11 +13,12 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -34,9 +36,15 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.SolidColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -78,7 +86,7 @@ fun ConfigScreen(
             if (configFile.exists()) configFile.readText(Charsets.UTF_8) else ""
         }
         if (!hasUserEdits.value) {
-            textState.value = TextFieldValue(content, selection = androidx.compose.ui.text.TextRange(0))
+            textState.value = TextFieldValue(content, selection = TextRange(0))
         }
         originalState.value = content
         missingState.value = !configFile.exists()
@@ -88,7 +96,7 @@ fun ConfigScreen(
         if (loadedState.value) {
             withFrameNanos { }
             focusRequester.requestFocus()
-            keyboardController?.show()
+            keyboardController?.hide()
         }
     }
     BackHandler(onBack = requestBack)
@@ -115,8 +123,7 @@ fun ConfigScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
             ) {
                 if (missingState.value) {
                     Text(
@@ -133,6 +140,19 @@ fun ConfigScreen(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                 }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(R.string.config_file_name),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -140,8 +160,13 @@ fun ConfigScreen(
                 ) {
                     if (loadedState.value) {
                         val scrollbarColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
-                        Box(modifier = Modifier.fillMaxSize().verticalScrollbar(editorScrollState, scrollbarColor)) {
-                            OutlinedTextField(
+                        Surface(
+                            modifier = Modifier.fillMaxSize(),
+                            shape = MaterialTheme.shapes.small,
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh
+                        ) {
+                            Box(modifier = Modifier.fillMaxSize().verticalScrollbar(editorScrollState, scrollbarColor)) {
+                                BasicTextField(
                                 value = textState.value,
                                 onValueChange = {
                                     if (canEditEffective) {
@@ -152,12 +177,23 @@ fun ConfigScreen(
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .verticalScroll(editorScrollState)
+                                    .padding(horizontal = 12.dp, vertical = 10.dp)
                                     .focusRequester(focusRequester),
                                 enabled = canEditEffective,
-                                textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                label = { Text(text = stringResource(R.string.config_file_name)) },
-                                maxLines = Int.MAX_VALUE
+                                textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 13.sp,
+                                    lineHeight = 19.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                ),
+                                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                keyboardOptions = KeyboardOptions(
+                                    capitalization = KeyboardCapitalization.None,
+                                    autoCorrect = false,
+                                    imeAction = ImeAction.Default
+                                )
                             )
+                            }
                         }
                     } else {
                         Text(
