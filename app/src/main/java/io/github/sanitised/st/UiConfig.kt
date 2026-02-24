@@ -33,10 +33,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.ImeAction
@@ -68,7 +71,10 @@ fun ConfigScreen(
     val loadedState = remember { mutableStateOf(false) }
     val hasUserEdits = remember { mutableStateOf(false) }
     val editorScrollState = rememberScrollState()
+    val editorViewportHeightPx = remember { mutableStateOf(0) }
+    val textLayoutState = remember { mutableStateOf<TextLayoutResult?>(null) }
     val focusRequester = remember { FocusRequester() }
+    val density = LocalDensity.current
     val context = LocalContext.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
@@ -97,6 +103,29 @@ fun ConfigScreen(
             withFrameNanos { }
             focusRequester.requestFocus()
             keyboardController?.hide()
+        }
+    }
+    LaunchedEffect(textState.value.selection, textLayoutState.value, editorViewportHeightPx.value) {
+        val layout = textLayoutState.value ?: return@LaunchedEffect
+        val viewportHeight = editorViewportHeightPx.value
+        if (viewportHeight <= 0) return@LaunchedEffect
+        val cursorOffset = textState.value.selection.end.coerceIn(0, textState.value.text.length)
+        val cursorRect = layout.getCursorRect(cursorOffset)
+        val caretPaddingPx = with(density) { 20.dp.toPx() }
+        val visibleTop = editorScrollState.value.toFloat()
+        val visibleBottom = visibleTop + viewportHeight.toFloat()
+        val targetTop = cursorRect.top - caretPaddingPx
+        val targetBottom = cursorRect.bottom + caretPaddingPx
+        when {
+            targetBottom > visibleBottom -> {
+                val targetScroll = (targetBottom - viewportHeight).toInt().coerceIn(0, editorScrollState.maxValue)
+                editorScrollState.animateScrollTo(targetScroll)
+            }
+
+            targetTop < visibleTop -> {
+                val targetScroll = targetTop.toInt().coerceIn(0, editorScrollState.maxValue)
+                editorScrollState.animateScrollTo(targetScroll)
+            }
         }
     }
     BackHandler(onBack = requestBack)
@@ -165,7 +194,12 @@ fun ConfigScreen(
                             shape = MaterialTheme.shapes.small,
                             color = MaterialTheme.colorScheme.surfaceContainerHigh
                         ) {
-                            Box(modifier = Modifier.fillMaxSize().verticalScrollbar(editorScrollState, scrollbarColor)) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .onSizeChanged { editorViewportHeightPx.value = it.height }
+                                    .verticalScrollbar(editorScrollState, scrollbarColor)
+                            ) {
                                 BasicTextField(
                                 value = textState.value,
                                 onValueChange = {
@@ -191,7 +225,8 @@ fun ConfigScreen(
                                     capitalization = KeyboardCapitalization.None,
                                     autoCorrect = false,
                                     imeAction = ImeAction.Default
-                                )
+                                ),
+                                onTextLayout = { textLayoutState.value = it }
                             )
                             }
                         }
