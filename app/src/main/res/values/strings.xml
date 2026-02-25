@@ -84,8 +84,8 @@
     <string name="manage_warning_backup">Back up your data first — use Export Data above.</string>
     <string name="manage_warning_body">Custom installs replace bundled code. Only install from repos you trust.</string>
     <string name="manage_warning_downgrade">Downgrades/forks can break data.</string>
-    <string name="manage_warning_title">⚠  Use at your own risk</string>
-    <string name="manage_warning_untrusted_code">Untrusted code can steal keys, chats, and characters, as well as attack other devices on your network</string>
+    <string name="manage_warning_title">Use at your own risk</string>
+    <string name="manage_warning_untrusted_code">Untrusted code can steal keys, chats, and characters, as well as attack other devices on your network.</string>
     <string name="manage_zip_step_1">Open the repository page on GitHub</string>
     <string name="manage_zip_step_2">Choose the branch/tag/commit</string>
     <string name="manage_zip_step_3">Click Code → Download ZIP</string>

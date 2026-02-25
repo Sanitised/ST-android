@@ -16,8 +16,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -455,16 +453,26 @@ internal class UpdateManager(
                     "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases?per_page=20"
                 )
                 val releases = JSONArray(body)
-                var chosen: GithubReleaseInfo? = null
+                var latestPrerelease: GithubReleaseInfo? = null
+                var latestStable: GithubReleaseInfo? = null
                 for (i in 0 until releases.length()) {
                     val item = releases.optJSONObject(i) ?: continue
-                    val draft = item.optBoolean("draft", false)
+                    if (item.optBoolean("draft", false)) continue
                     val prerelease = item.optBoolean("prerelease", false)
-                    if (draft || !prerelease) continue
-                    chosen = parseReleaseObject(item)
-                    break
+                    val parsed = parseReleaseObject(item) ?: continue
+                    if (prerelease && latestPrerelease == null) {
+                        latestPrerelease = parsed
+                    } else if (!prerelease && latestStable == null) {
+                        latestStable = parsed
+                    }
+                    if (latestPrerelease != null && latestStable != null) break
                 }
-                chosen
+                when {
+                    latestPrerelease == null -> latestStable
+                    latestStable == null -> latestPrerelease
+                    Versioning.isRemoteVersionNewer(latestPrerelease.tagName, latestStable.tagName) -> latestStable
+                    else -> latestPrerelease
+                }
             }
         }
     }
@@ -500,29 +508,6 @@ internal class UpdateManager(
     }
 
     private fun githubApiGet(url: String): String {
-        val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = 15_000
-            readTimeout = 15_000
-            setRequestProperty("Accept", "application/vnd.github+json")
-            setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
-            setRequestProperty("User-Agent", "st-android-update-check")
-        }
-        return try {
-            val status = connection.responseCode
-            val stream = if (status in 200..299) {
-                connection.inputStream
-            } else {
-                connection.errorStream
-            }
-            val body = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
-            if (status !in 200..299) {
-                val shortenedBody = body.replace('\n', ' ').take(240)
-                throw IllegalStateException("GitHub API HTTP $status: $shortenedBody")
-            }
-            body
-        } finally {
-            connection.disconnect()
-        }
+        return HttpDownloader.githubApiGet(url, "st-android-update-check")
     }
 }

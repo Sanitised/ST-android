@@ -165,12 +165,10 @@ class NodePayload(private val context: Context) {
         if (!file.setExecutable(true, true)) {
             // Fall through to chmod attempt.
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            try {
-                Os.chmod(file.absolutePath, 0x1C0) // 0700
-            } catch (_: Exception) {
-                // If chmod fails, let the later execution attempt surface the error.
-            }
+        try {
+            Os.chmod(file.absolutePath, 0x1C0) // 0700
+        } catch (_: Exception) {
+            // If chmod fails, let the later execution attempt surface the error.
         }
         if (!file.canExecute()) {
             throw IllegalStateException("Node binary is not executable: ${file.absolutePath}")

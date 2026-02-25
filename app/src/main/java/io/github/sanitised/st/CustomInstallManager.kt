@@ -12,8 +12,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -618,30 +616,7 @@ internal class CustomInstallManager(
     }
 
     private fun githubApiGet(url: String): String {
-        val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = 15_000
-            readTimeout = 15_000
-            setRequestProperty("Accept", "application/vnd.github+json")
-            setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
-            setRequestProperty("User-Agent", "st-android-custom-install")
-        }
-        return try {
-            val status = connection.responseCode
-            val stream = if (status in 200..299) {
-                connection.inputStream
-            } else {
-                connection.errorStream
-            }
-            val body = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
-            if (status !in 200..299) {
-                val shortenedBody = body.replace('\n', ' ').take(240)
-                throw IllegalStateException("GitHub API HTTP $status: $shortenedBody")
-            }
-            body
-        } finally {
-            connection.disconnect()
-        }
+        return HttpDownloader.githubApiGet(url, "st-android-custom-install")
     }
 
     private fun formatByteCount(bytes: Long): String {

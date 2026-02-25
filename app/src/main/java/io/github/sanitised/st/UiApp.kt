@@ -338,7 +338,7 @@ fun STAndroidApp(
 private fun probeServer(port: Int): Boolean {
     return try {
         Socket().use { socket ->
-            socket.connect(InetSocketAddress("127.0.0.1", port), 1000)
+            socket.connect(InetSocketAddress("127.0.0.1", port), 500)
             true
         }
     } catch (_: Exception) {

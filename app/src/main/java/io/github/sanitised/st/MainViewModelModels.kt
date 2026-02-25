@@ -26,7 +26,7 @@ enum class UpdateChannel(val storageValue: String) {
 
     companion object {
         fun fromStorage(value: String?): UpdateChannel {
-            return values().firstOrNull { it.storageValue == value } ?: RELEASE
+            return entries.firstOrNull { it.storageValue == value } ?: RELEASE
         }
     }
 }
