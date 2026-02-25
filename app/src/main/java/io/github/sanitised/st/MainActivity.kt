@@ -45,6 +45,7 @@ import java.io.File
 import java.nio.file.Files
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import org.yaml.snakeyaml.Yaml
 
 private sealed interface AppScreen {
     object Home : AppScreen
@@ -559,14 +560,16 @@ class MainActivity : ComponentActivity() {
         val configFile = AppPaths(this).configFile
         if (!configFile.exists()) return DEFAULT_PORT
         return try {
-            val port = configFile.useLines { lines ->
-                val regex = Regex("^port\\s*:\\s*(\\d+)\\s*$")
-                lines.map { it.substringBefore("#") }
-                    .mapNotNull { regex.find(it)?.groupValues?.getOrNull(1) }
-                    .firstOrNull()
-                    ?.toIntOrNull()
+            val yamlRoot = configFile.inputStream().bufferedReader(Charsets.UTF_8).use { reader ->
+                Yaml().load<Any?>(reader)
             }
-            if (port != null && port in 1..65535) port else DEFAULT_PORT
+            val rawPort = (yamlRoot as? Map<*, *>)?.get("port")
+            val parsedPort = when (rawPort) {
+                is Number -> rawPort.toInt()
+                is String -> rawPort.trim().toIntOrNull()
+                else -> null
+            }
+            parsedPort?.takeIf { it in 1..65535 } ?: DEFAULT_PORT
         } catch (_: Exception) {
             DEFAULT_PORT
         }

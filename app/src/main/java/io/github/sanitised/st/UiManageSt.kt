@@ -85,8 +85,9 @@ fun ManageStScreen(
 ) {
     val allRefsByKey = remember(allRefs) { allRefs.associateBy { it.key } }
     val selectedRef = remember(selectedRefKey, allRefsByKey, featuredRefs) {
-        selectedRefKey?.let { key -> allRefsByKey[key] }
-            ?: featuredRefs.firstOrNull { it.key == selectedRefKey }
+        selectedRefKey?.let { key ->
+            allRefsByKey[key] ?: featuredRefs.firstOrNull { it.key == key }
+        }
     }
 
     Surface(modifier = Modifier.fillMaxSize()) {
@@ -204,7 +205,7 @@ fun ManageStScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     imageVector = Icons.Filled.Warning,
-                                    contentDescription = null,
+                                    contentDescription = stringResource(R.string.manage_warning_title),
                                     tint = MaterialTheme.colorScheme.onErrorContainer,
                                     modifier = Modifier.size(20.dp)
                                 )

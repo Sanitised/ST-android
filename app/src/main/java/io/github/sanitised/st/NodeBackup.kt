@@ -6,6 +6,7 @@ import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.io.PushbackInputStream
@@ -230,6 +231,8 @@ object NodeBackup {
             }
         } catch (e: java.util.zip.ZipException) {
             throw IllegalStateException("Not a valid ZIP archive: ${e.message}", e)
+        } catch (e: IOException) {
+            throw IllegalStateException("Unable to read ZIP archive: ${e.message}", e)
         }
     }
 

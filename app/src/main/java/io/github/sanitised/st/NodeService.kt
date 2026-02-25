@@ -87,9 +87,15 @@ class NodeService : Service() {
         val shouldStart = synchronized(this) {
             if (process != null) return@synchronized false
             if (status.state == NodeState.STARTING || status.state == NodeState.STOPPING) return@synchronized false
+            stopRequested = false
+            status = status.copy(
+                state = NodeState.STARTING,
+                message = getString(R.string.node_status_starting)
+            )
             true
         }
         if (!shouldStart) return
+        notifyStatus(status)
         serviceScope.launch { startNodeInternal() }
     }
 
@@ -98,8 +104,6 @@ class NodeService : Service() {
             if (process != null) {
                 return
             }
-            stopRequested = false
-            updateStatus(NodeState.STARTING, getString(R.string.node_status_starting))
         }
         val layout = try {
             val layoutResult = payload.ensureExtracted()
