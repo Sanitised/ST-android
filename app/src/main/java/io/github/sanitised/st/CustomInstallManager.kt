@@ -74,15 +74,18 @@ internal class CustomInstallManager(
         customSourceDownloadJob?.cancel()
     }
 
+    private fun s(resId: Int): String = application.getString(resId)
+    private fun s(resId: Int, vararg args: Any): String = application.getString(resId, *args)
+
     fun installCustomZip(uri: Uri) {
         if (getBusyOperation() != null) {
-            postUserMessage("Wait for the current operation to finish.")
+            postUserMessage(s(R.string.custom_wait_for_operation))
             return
         }
         setBusyOperation(BusyOperation.INSTALLING)
         startCustomOperationCard(
-            title = "Installing Custom ST",
-            details = "Preparing archive…",
+            title = s(R.string.custom_op_installing_title),
+            details = s(R.string.custom_op_preparing_archive),
             progressPercent = null,
             cancelable = false,
             anchor = CustomOperationAnchor.ZIP_INSTALL
@@ -98,8 +101,8 @@ internal class CustomInstallManager(
             refreshCustomInstallState()
             setBusyOperation(null)
             val msg = result.fold(
-                onSuccess = { "Custom ST installed successfully." },
-                onFailure = { "Installation failed: ${it.message ?: "unknown error"}" }
+                onSuccess = { s(R.string.custom_install_success) },
+                onFailure = { s(R.string.custom_install_failed, it.message ?: s(R.string.unknown_error)) }
             )
             finishCustomOperationCard(msg)
             appendServiceLog(msg)
@@ -108,13 +111,13 @@ internal class CustomInstallManager(
 
     fun resetToDefault() {
         if (getBusyOperation() != null) {
-            postUserMessage("Wait for the current operation to finish.")
+            postUserMessage(s(R.string.custom_wait_for_operation))
             return
         }
         setBusyOperation(BusyOperation.RESETTING)
         startCustomOperationCard(
-            title = "Resetting to Bundled Version",
-            details = "Preparing reset…",
+            title = s(R.string.custom_op_resetting_title),
+            details = s(R.string.custom_op_preparing_reset),
             progressPercent = null,
             cancelable = false,
             anchor = CustomOperationAnchor.RESET_TO_BUNDLED
@@ -130,8 +133,8 @@ internal class CustomInstallManager(
             refreshCustomInstallState()
             setBusyOperation(null)
             val msg = result.fold(
-                onSuccess = { "Reset to default complete." },
-                onFailure = { "Reset failed: ${it.message ?: "unknown error"}" }
+                onSuccess = { s(R.string.custom_reset_complete) },
+                onFailure = { s(R.string.custom_reset_failed, it.message ?: s(R.string.unknown_error)) }
             )
             finishCustomOperationCard(msg)
             appendServiceLog(msg)
@@ -151,12 +154,12 @@ internal class CustomInstallManager(
     fun loadCustomRepoRefs() {
         if (isLoadingCustomRefs.value || isDownloadingCustomSource.value) return
         if (getBusyOperation() != null && getBusyOperation() != BusyOperation.DOWNLOADING_CUSTOM_SOURCE) {
-            postUserMessage("Wait for the current operation to finish.")
+            postUserMessage(s(R.string.custom_wait_for_operation))
             return
         }
         val parsedRepo = parseGithubRepoInput(customRepoInput.value)
         if (parsedRepo == null) {
-            customRepoValidationMessage.value = "Enter repo as owner/repo."
+            customRepoValidationMessage.value = s(R.string.custom_repo_validation_format)
             customFeaturedRefs.value = emptyList()
             customAllRefs.value = emptyList()
             selectedCustomRefKey.value = null
@@ -182,15 +185,15 @@ internal class CustomInstallManager(
                     else -> null
                 }
                 val resultMessage = when {
-                    all.isEmpty() -> "No branches or tags found."
-                    else -> "Loaded ${all.size} refs from ${parsedRepo.first}/${parsedRepo.second}."
+                    all.isEmpty() -> s(R.string.custom_refs_none_found)
+                    else -> s(R.string.custom_refs_loaded, all.size, "${parsedRepo.first}/${parsedRepo.second}")
                 }
                 postUserMessage(resultMessage)
             }.onFailure { error ->
                 customFeaturedRefs.value = emptyList()
                 customAllRefs.value = emptyList()
                 selectedCustomRefKey.value = null
-                postUserMessage("Failed to load refs: ${error.message ?: "unknown error"}")
+                postUserMessage(s(R.string.custom_refs_load_failed, error.message ?: s(R.string.unknown_error)))
                 scope.launch {
                     appendServiceLog("custom-refs: failed: ${error.message ?: "unknown error"}")
                 }
@@ -203,18 +206,18 @@ internal class CustomInstallManager(
         if (isDownloadingCustomSource.value) return
         customInstallValidationMessage.value = ""
         if (getBusyOperation() != null) {
-            postUserMessage("Wait for the current operation to finish.")
+            postUserMessage(s(R.string.custom_wait_for_operation))
             return
         }
         val parsedRepo = parseGithubRepoInput(customRepoInput.value)
         if (parsedRepo == null) {
-            customRepoValidationMessage.value = "Enter repo as owner/repo."
+            customRepoValidationMessage.value = s(R.string.custom_repo_validation_format)
             return
         }
         customRepoValidationMessage.value = ""
         val selectedRef = selectedCustomRef()
         if (selectedRef == null) {
-            customInstallValidationMessage.value = "Select a branch or tag first."
+            customInstallValidationMessage.value = s(R.string.custom_select_ref_first)
             return
         }
 
@@ -222,8 +225,8 @@ internal class CustomInstallManager(
         setBusyOperation(BusyOperation.DOWNLOADING_CUSTOM_SOURCE)
         isDownloadingCustomSource.value = true
         startCustomOperationCard(
-            title = "Installing Custom ST",
-            details = "Downloading ${selectedRef.refType} ${selectedRef.refName}...",
+            title = s(R.string.custom_op_installing_title),
+            details = s(R.string.custom_op_downloading, selectedRef.refType, selectedRef.refName),
             progressPercent = 0,
             cancelable = true,
             anchor = CustomOperationAnchor.GITHUB_INSTALL
@@ -253,9 +256,9 @@ internal class CustomInstallManager(
                             val downloadedLabel = formatByteCount(downloadedBytes)
                             val totalLabel = totalBytes?.let { formatByteCount(it) }
                             val details = if (totalLabel == null) {
-                                "Downloading ${selectedRef.refType} ${selectedRef.refName}... $downloadedLabel"
+                                s(R.string.custom_op_downloading_progress, selectedRef.refType, selectedRef.refName, downloadedLabel)
                             } else {
-                                "Downloading ${selectedRef.refType} ${selectedRef.refName}... $downloadedLabel / $totalLabel"
+                                s(R.string.custom_op_downloading_progress_total, selectedRef.refType, selectedRef.refName, downloadedLabel, totalLabel)
                             }
                             updateCustomOperationCard(
                                 details = details,
@@ -269,7 +272,7 @@ internal class CustomInstallManager(
                 isDownloadingCustomSource.value = false
                 setBusyOperation(BusyOperation.INSTALLING)
                 updateCustomOperationCard(
-                    details = "Download complete. Installing...",
+                    details = s(R.string.custom_op_download_complete),
                     progressPercent = null,
                     cancelable = false
                 )
@@ -293,21 +296,21 @@ internal class CustomInstallManager(
                 refreshCustomInstallState()
                 val finalMessage = result.fold(
                     onSuccess = {
-                        "Custom ST installed from ${selectedRef.refType}/${selectedRef.refName}."
+                        s(R.string.custom_install_from_ref_success, selectedRef.refType, selectedRef.refName)
                     },
                     onFailure = {
-                        "Installation failed: ${it.message ?: "unknown error"}"
+                        s(R.string.custom_install_failed, it.message ?: s(R.string.unknown_error))
                     }
                 )
                 finishCustomOperationCard(finalMessage)
                 appendServiceLog(finalMessage)
             } catch (_: CancellationException) {
-                finishCustomOperationCard("Custom source download canceled.")
+                finishCustomOperationCard(s(R.string.custom_download_canceled))
             } catch (error: Exception) {
                 val detail = "custom-source-download: failed: ${error.message ?: "unknown error"}"
                 Log.w(TAG, detail)
                 appendServiceLog(detail)
-                finishCustomOperationCard("Installation failed: ${error.message ?: "unknown error"}")
+                finishCustomOperationCard(s(R.string.custom_install_failed, error.message ?: s(R.string.unknown_error)))
             } finally {
                 if (zipFile.exists()) {
                     zipFile.delete()
@@ -326,11 +329,30 @@ internal class CustomInstallManager(
         setBusyOperation(BusyOperation.REMOVING_DATA)
         scope.launch {
             val paths = AppPaths(application)
-            withContext(Dispatchers.IO) {
-                paths.configDir.deleteRecursively()
-                paths.dataDir.deleteRecursively()
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val failedPaths = mutableListOf<String>()
+
+                    fun removePath(path: File) {
+                        if (!path.exists()) return
+                        val removed = path.deleteRecursively()
+                        if (!removed && path.exists()) {
+                            failedPaths += path.name
+                        }
+                    }
+
+                    removePath(paths.configDir)
+                    removePath(paths.dataDir)
+
+                    if (failedPaths.isNotEmpty()) {
+                        throw IllegalStateException("could not delete: ${failedPaths.joinToString(", ")}")
+                    }
+                }
             }
-            val msg = "User data removed."
+            val msg = result.fold(
+                onSuccess = { s(R.string.custom_user_data_removed) },
+                onFailure = { s(R.string.custom_user_data_remove_failed, it.message ?: s(R.string.unknown_error)) }
+            )
             setBusyOperation(null)
             postUserMessage(msg)
             appendServiceLog(msg)

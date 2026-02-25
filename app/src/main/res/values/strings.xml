@@ -128,4 +128,87 @@
     <string name="update_headline_downloading">Downloading update %1$s</string>
     <string name="update_headline_ready">New update %1$s is ready.</string>
     <string name="waiting_for_server">Waiting for server...</string>
+
+    <!-- Backup operation cards -->
+    <string name="backup_op_exporting_title">Exporting Backup</string>
+    <string name="backup_op_preparing_export">Preparing export…</string>
+    <string name="backup_op_importing_title">Importing Backup</string>
+    <string name="backup_op_preparing_import">Preparing import…</string>
+    <string name="backup_export_failed">Export failed: %1$s</string>
+    <string name="backup_import_failed">Import failed: %1$s</string>
+    <string name="backup_import_post_install_failed">Import complete, post-install failed: %1$s</string>
+    <string name="backup_import_complete">Import complete</string>
+
+    <!-- Backup progress (NodeBackup) -->
+    <string name="backup_progress_preparing_export">Preparing export…</string>
+    <string name="backup_progress_exporting">Exporting backup…</string>
+    <string name="backup_progress_export_completed">Export completed</string>
+    <string name="backup_progress_preparing_import">Preparing import…</string>
+    <string name="backup_progress_extracting">Extracting backup…</string>
+    <string name="backup_progress_applying">Applying backup…</string>
+    <string name="backup_progress_import_complete">Import complete</string>
+
+    <!-- Custom install operation cards -->
+    <string name="custom_op_installing_title">Installing Custom ST</string>
+    <string name="custom_op_preparing_archive">Preparing archive…</string>
+    <string name="custom_op_resetting_title">Resetting to Bundled Version</string>
+    <string name="custom_op_preparing_reset">Preparing reset…</string>
+    <string name="custom_op_downloading">Downloading %1$s %2$s…</string>
+    <string name="custom_op_downloading_progress">Downloading %1$s %2$s… %3$s</string>
+    <string name="custom_op_downloading_progress_total">Downloading %1$s %2$s… %3$s / %4$s</string>
+    <string name="custom_op_download_complete">Download complete. Installing…</string>
+
+    <!-- Custom install user messages -->
+    <string name="custom_wait_for_operation">Wait for the current operation to finish.</string>
+    <string name="custom_install_success">Custom ST installed successfully.</string>
+    <string name="custom_install_failed">Installation failed: %1$s</string>
+    <string name="custom_reset_complete">Reset to default complete.</string>
+    <string name="custom_reset_failed">Reset failed: %1$s</string>
+    <string name="custom_repo_validation_format">Enter repo as owner/repo.</string>
+    <string name="custom_refs_none_found">No branches or tags found.</string>
+    <string name="custom_refs_loaded">Loaded %1$d refs from %2$s.</string>
+    <string name="custom_refs_load_failed">Failed to load refs: %1$s</string>
+    <string name="custom_select_ref_first">Select a branch or tag first.</string>
+    <string name="custom_install_from_ref_success">Custom ST installed from %1$s/%2$s.</string>
+    <string name="custom_download_canceled">Custom source download canceled.</string>
+    <string name="custom_user_data_removed">User data removed.</string>
+    <string name="custom_user_data_remove_failed">Failed to remove user data: %1$s</string>
+
+    <!-- Update user messages -->
+    <string name="update_auto_check_enabled">Automatic checks enabled.</string>
+    <string name="update_dismissed_hours">Update %1$s dismissed for 72 hours.</string>
+    <string name="update_no_apk">Update found, but this release does not include an Android install file.</string>
+    <string name="update_downloaded_ready">Update %1$s downloaded. Ready to install.</string>
+    <string name="update_download_canceled">Update download canceled.</string>
+    <string name="update_tap_install">Tap Install to download and install %1$s.</string>
+    <string name="update_download_failed">Update download failed. Please try again.</string>
+    <string name="update_none_selected">No update is selected.</string>
+    <string name="update_download_first">Download the update first.</string>
+    <string name="update_apk_not_found">Downloaded APK was not found.</string>
+    <string name="update_allow_installs">Allow installs from this source, then tap Install now again.</string>
+    <string name="update_installer_opened">Installer opened. Confirm installation to update.</string>
+    <string name="update_installer_failed">Couldn\'t open installer: %1$s</string>
+    <string name="update_no_release">No published release was found.</string>
+    <string name="update_already_latest">You\'re already on the latest version.</string>
+    <string name="update_new_available">New update %1$s is available.</string>
+    <string name="update_ready_to_install">Update %1$s is ready to install.</string>
+    <string name="update_check_failed">Update check failed. Please try again.</string>
+
+    <!-- Notification -->
+    <string name="notification_title">SillyTavern Node</string>
+    <string name="notification_stop_action">Stop</string>
+    <string name="notification_channel_name">Node service</string>
+
+    <!-- Node service status messages -->
+    <string name="node_status_idle">Idle</string>
+    <string name="node_status_starting">Starting node</string>
+    <string name="node_status_running">Running</string>
+    <string name="node_status_stopping">Stopping</string>
+    <string name="node_status_stopped">Stopped</string>
+    <string name="node_status_exited">Exited</string>
+    <string name="node_status_exited_with_code">Exited with code %1$s</string>
+    <string name="node_status_extraction_failed">Extraction failed</string>
+    <string name="node_status_binary_not_found">Node binary not found</string>
+    <string name="node_status_start_failed">Failed to start node</string>
+    <string name="node_status_foreground_not_allowed">Foreground service not allowed</string>
 </resources>

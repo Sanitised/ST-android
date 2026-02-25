@@ -20,11 +20,14 @@ internal class BackupManager(
     val backupOperationCard: MutableState<OperationCardState> = operationCardController.state
     val backupOperationCardAnchor = mutableStateOf(BackupOperationAnchor.EXPORT)
 
+    private fun s(resId: Int): String = application.getString(resId)
+    private fun s(resId: Int, vararg args: Any): String = application.getString(resId, *args)
+
     fun export(uri: Uri) {
         setBusyOperation(BusyOperation.EXPORTING)
         startBackupOperationCard(
-            title = "Exporting Backup",
-            details = "Preparing export…",
+            title = s(R.string.backup_op_exporting_title),
+            details = s(R.string.backup_op_preparing_export),
             progressPercent = null,
             anchor = BackupOperationAnchor.EXPORT
         )
@@ -39,7 +42,9 @@ internal class BackupManager(
                     }
                 }
             }
-            val msg = result.getOrElse { "Export failed: ${it.message ?: "unknown error"}" }
+            val msg = result.getOrElse {
+                s(R.string.backup_export_failed, it.message ?: s(R.string.unknown_error))
+            }
             setBusyOperation(null)
             finishBackupOperationCard(msg)
             appendServiceLog(msg)
@@ -49,8 +54,8 @@ internal class BackupManager(
     fun import(uri: Uri) {
         setBusyOperation(BusyOperation.IMPORTING)
         startBackupOperationCard(
-            title = "Importing Backup",
-            details = "Preparing import…",
+            title = s(R.string.backup_op_importing_title),
+            details = s(R.string.backup_op_preparing_import),
             progressPercent = null,
             anchor = BackupOperationAnchor.IMPORT
         )
@@ -74,10 +79,10 @@ internal class BackupManager(
             }
             val msg = when {
                 importResult.isFailure ->
-                    "Import failed: ${importResult.exceptionOrNull()?.message ?: "unknown error"}"
+                    s(R.string.backup_import_failed, importResult.exceptionOrNull()?.message ?: s(R.string.unknown_error))
                 postInstallResult.isFailure ->
-                    "Import complete, post-install failed: ${postInstallResult.exceptionOrNull()?.message ?: "unknown error"}"
-                else -> "Import complete"
+                    s(R.string.backup_import_post_install_failed, postInstallResult.exceptionOrNull()?.message ?: s(R.string.unknown_error))
+                else -> s(R.string.backup_import_complete)
             }
             setBusyOperation(null)
             finishBackupOperationCard(msg)

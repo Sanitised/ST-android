@@ -53,7 +53,7 @@ object NodeBackup {
                 onProgress(BackupProgress(message = message, percent = percent))
             }
 
-            report("Preparing export…", force = true)
+            report(context.getString(R.string.backup_progress_preparing_export), force = true)
             context.contentResolver.openOutputStream(uri)?.use { output ->
                 BufferedOutputStream(output).use { buffered ->
                     GZIPOutputStream(buffered).use { gz ->
@@ -65,14 +65,14 @@ object NodeBackup {
                                 file = configFile
                             ) { copied ->
                                 copiedBytes += copied
-                                report("Exporting backup…")
+                                report(context.getString(R.string.backup_progress_exporting))
                             }
                         }
                         if (dataDir.exists()) {
                             writeTarDirectory(gz, "$BACKUP_ROOT/data/")
                             writeTarTree(gz, dataDir, "$BACKUP_ROOT/data") { copied ->
                                 copiedBytes += copied
-                                report("Exporting backup…")
+                                report(context.getString(R.string.backup_progress_exporting))
                             }
                         }
                         finishTar(gz)
@@ -80,8 +80,9 @@ object NodeBackup {
                 }
             } ?: throw IllegalStateException("Unable to open destination")
             copiedBytes = totalBytes
-            report("Export completed", force = true)
-            "Export completed"
+            val completedMsg = context.getString(R.string.backup_progress_export_completed)
+            report(completedMsg, force = true)
+            completedMsg
         }
     }
 
@@ -103,8 +104,9 @@ object NodeBackup {
                     afd.length.takeIf { it > 0L }
                 }
             }.getOrNull()
-            onProgress(BackupProgress("Preparing import…", null))
+            onProgress(BackupProgress(context.getString(R.string.backup_progress_preparing_import), null))
 
+            val extractingMsg = context.getString(R.string.backup_progress_extracting)
             context.contentResolver.openInputStream(uri)?.use { raw ->
                 val countingRaw = CountingInputStream(BufferedInputStream(raw))
                 val pushback = PushbackInputStream(countingRaw, 2)
@@ -126,25 +128,25 @@ object NodeBackup {
                 val sig = ByteArray(2)
                 val read = pushback.read(sig)
                 if (read > 0) pushback.unread(sig, 0, read)
-                reportExtractProgress("Extracting backup…", true)
+                reportExtractProgress(extractingMsg, true)
                 when {
                     read == 2 && sig[0] == 0x50.toByte() && sig[1] == 0x4B.toByte() ->
                         extractBackupFromZip(pushback, importDir) {
-                            reportExtractProgress("Extracting backup…", false)
+                            reportExtractProgress(extractingMsg, false)
                         }
 
                     read == 2 && sig[0] == 0x1F.toByte() && sig[1] == 0x8B.toByte() ->
                         extractBackup(GZIPInputStream(pushback), importDir) {
-                            reportExtractProgress("Extracting backup…", false)
+                            reportExtractProgress(extractingMsg, false)
                         }
 
                     else ->
                         extractBackup(pushback, importDir) {
-                            reportExtractProgress("Extracting backup…", false)
+                            reportExtractProgress(extractingMsg, false)
                         }
                 }
             } ?: throw IllegalStateException("Unable to open archive")
-            onProgress(BackupProgress("Applying backup…", null))
+            onProgress(BackupProgress(context.getString(R.string.backup_progress_applying), null))
 
             val configSrc = File(importDir, "config/config.yaml")
             val dataSrc = File(importDir, "data")
@@ -195,8 +197,9 @@ object NodeBackup {
             }
 
             importDir.deleteRecursively()
-            onProgress(BackupProgress("Import complete", 100))
-            "Import complete"
+            val importCompleteMsg = context.getString(R.string.backup_progress_import_complete)
+            onProgress(BackupProgress(importCompleteMsg, 100))
+            importCompleteMsg
         }
     }
 

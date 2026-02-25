@@ -90,6 +90,9 @@ internal class UpdateManager(
     val downloadedUpdateTag = mutableStateOf<String?>(null)
     val downloadedApkPath = mutableStateOf<String?>(null)
 
+    private fun s(resId: Int): String = application.getString(resId)
+    private fun s(resId: Int, vararg args: Any): String = application.getString(resId, *args)
+
     fun onCleared() {
         updateDownloadJob?.cancel()
     }
@@ -131,7 +134,7 @@ internal class UpdateManager(
         setAutoCheckForUpdates(true)
         autoOptInPromptShown.value = true
         updatePrefs.edit().putBoolean(PREF_AUTO_OPTIN_PROMPT_SHOWN, true).apply()
-        postUserMessage("Automatic checks enabled.")
+        postUserMessage(s(R.string.update_auto_check_enabled))
         checkForUpdates("manual")
     }
 
@@ -164,14 +167,14 @@ internal class UpdateManager(
         val until = now + THREE_DAYS_MS
         updateDismissedUntilMs.value = until
         updatePrefs.edit().putLong(PREF_UPDATE_DISMISSED_UNTIL_MS, until).apply()
-        postUserMessage("Update ${update.tagName} dismissed for 72 hours.")
+        postUserMessage(s(R.string.update_dismissed_hours, update.tagName))
     }
 
     fun startAvailableUpdateDownload() {
         val update = availableUpdate.value ?: return
         val downloadUrl = update.apkAssetUrl
         if (downloadUrl.isNullOrBlank()) {
-            postUserMessage("Update found, but this release does not include an Android install file.")
+            postUserMessage(s(R.string.update_no_apk))
             return
         }
         if (isDownloadingUpdate.value) return
@@ -194,18 +197,18 @@ internal class UpdateManager(
                 }
                 downloadedUpdateTag.value = update.tagName
                 downloadedApkPath.value = downloadedFile.absolutePath
-                updateBannerMessage.value = "Update ${update.tagName} downloaded. Ready to install."
+                updateBannerMessage.value = s(R.string.update_downloaded_ready, update.tagName)
                 updateDismissedUntilMs.value = 0L
                 updatePrefs.edit().putLong(PREF_UPDATE_DISMISSED_UNTIL_MS, 0L).apply()
             } catch (_: CancellationException) {
-                postUserMessage("Update download canceled.")
-                updateBannerMessage.value = "Tap Install to download and install ${update.tagName}."
+                postUserMessage(s(R.string.update_download_canceled))
+                updateBannerMessage.value = s(R.string.update_tap_install, update.tagName)
             } catch (e: Exception) {
                 val detail = "update-download: failed for ${update.tagName}: ${e.message ?: "unknown error"}"
                 Log.w(TAG, detail)
                 appendServiceLog(detail)
-                postUserMessage("Update download failed. Please try again.")
-                updateBannerMessage.value = "Tap Install to download and install ${update.tagName}."
+                postUserMessage(s(R.string.update_download_failed))
+                updateBannerMessage.value = s(R.string.update_tap_install, update.tagName)
             } finally {
                 isDownloadingUpdate.value = false
                 downloadProgressPercent.value = null
@@ -220,17 +223,17 @@ internal class UpdateManager(
     fun installDownloadedUpdate(context: Context) {
         val candidate = availableUpdate.value
         if (candidate == null) {
-            postUserMessage("No update is selected.")
+            postUserMessage(s(R.string.update_none_selected))
             return
         }
         val apkPath = downloadedApkPath.value
         if (apkPath.isNullOrBlank()) {
-            postUserMessage("Download the update first.")
+            postUserMessage(s(R.string.update_download_first))
             return
         }
         val apkFile = File(apkPath)
         if (!apkFile.exists()) {
-            postUserMessage("Downloaded APK was not found.")
+            postUserMessage(s(R.string.update_apk_not_found))
             return
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
@@ -241,7 +244,7 @@ internal class UpdateManager(
                 Uri.parse("package:${context.packageName}")
             ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(settingsIntent)
-            updateBannerMessage.value = "Allow installs from this source, then tap Install now again."
+            updateBannerMessage.value = s(R.string.update_allow_installs)
             return
         }
         val authority = "${context.packageName}.fileprovider"
@@ -254,9 +257,9 @@ internal class UpdateManager(
         runCatching {
             context.startActivity(installIntent)
         }.onSuccess {
-            postUserMessage("Installer opened. Confirm installation to update.")
+            postUserMessage(s(R.string.update_installer_opened))
         }.onFailure { error ->
-            postUserMessage("Couldn't open installer: ${error.message ?: "unknown error"}")
+            postUserMessage(s(R.string.update_installer_failed, error.message ?: s(R.string.unknown_error)))
         }
     }
 
@@ -298,21 +301,21 @@ internal class UpdateManager(
                             availableUpdate.value = null
                             updateBannerMessage.value = ""
                             if (reason == "manual") {
-                                postUserMessage("No published release was found.")
+                                postUserMessage(s(R.string.update_no_release))
                             }
                         }
                         !result.updateNeeded -> {
                             availableUpdate.value = null
                             updateBannerMessage.value = ""
                             if (reason == "manual") {
-                                postUserMessage("You're already on the latest version.")
+                                postUserMessage(s(R.string.update_already_latest))
                             }
                         }
                         latest.apkAssetUrl.isNullOrBlank() -> {
                             availableUpdate.value = null
                             updateBannerMessage.value = ""
                             if (reason == "manual") {
-                                postUserMessage("Update found, but this release does not include an Android install file.")
+                                postUserMessage(s(R.string.update_no_apk))
                             }
                         }
                         else -> {
@@ -320,18 +323,18 @@ internal class UpdateManager(
                             updateDismissedUntilMs.value = 0L
                             updatePrefs.edit().putLong(PREF_UPDATE_DISMISSED_UNTIL_MS, 0L).apply()
                             if (reason == "manual") {
-                                postUserMessage("New update ${latest.tagName} is available.")
+                                postUserMessage(s(R.string.update_new_available, latest.tagName))
                             }
                             if (isAvailableUpdateDownloaded()) {
-                                updateBannerMessage.value = "Update ${latest.tagName} is ready to install."
+                                updateBannerMessage.value = s(R.string.update_ready_to_install, latest.tagName)
                             } else {
-                                updateBannerMessage.value = "Tap Install to download and install ${latest.tagName}."
+                                updateBannerMessage.value = s(R.string.update_tap_install, latest.tagName)
                             }
                         }
                     }
                 }.onFailure {
                     if (reason == "manual") {
-                        postUserMessage("Update check failed. Please try again.")
+                        postUserMessage(s(R.string.update_check_failed))
                     }
                 }
 
