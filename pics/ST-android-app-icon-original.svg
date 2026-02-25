@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="108" height="108">
+  <defs>
+    <linearGradient id="bg2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1c2541"/>
+      <stop offset="100%" stop-color="#0b132b"/>
+    </linearGradient>
+    <linearGradient id="mugGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d4a44a"/>
+      <stop offset="100%" stop-color="#a67c2e"/>
+    </linearGradient>
+    <linearGradient id="mugSide" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#b8892a"/>
+      <stop offset="100%" stop-color="#d4a44a"/>
+    </linearGradient>
+    <linearGradient id="foam" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fff8e7"/>
+      <stop offset="100%" stop-color="#f0d89a"/>
+    </linearGradient>
+    <linearGradient id="liquid" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#d4872a"/>
+      <stop offset="100%" stop-color="#8b4513"/>
+    </linearGradient>
+    <filter id="softGlow2">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="108" height="108" rx="24" fill="url(#bg2)"/>
+
+  <g filter="url(#softGlow2)" opacity="0.9">
+    <path d="M 36 14 Q 36 8 44 8 L 66 8 Q 74 8 74 14 L 74 30 Q 74 36 66 36 L 56 36 L 50 44 L 50 36 L 44 36 Q 36 36 36 30 Z" fill="white" opacity="0.92"/>
+    <circle cx="48" cy="22" r="2.5" fill="#1c2541"/>
+    <circle cx="55" cy="22" r="2.5" fill="#1c2541"/>
+    <circle cx="62" cy="22" r="2.5" fill="#1c2541"/>
+  </g>
+
+  <path d="M 68 58 C 84 58, 84 80, 66 80" fill="none" stroke="url(#mugGrad)" stroke-width="6" stroke-linecap="round"/>
+  <path d="M 68 58 C 84 58, 84 80, 66 80" fill="none" stroke="#b8892a" stroke-width="2" stroke-linecap="round"/>
+
+  <path d="M 33 50 L 35 94 Q 51 102 67 94 L 69 50 Z" fill="url(#mugGrad)" stroke="#8b6914" stroke-width="1.5"/>
+
+  <path d="M 37 50 L 38 90 Q 51 96 64 90 L 65 50 Z" fill="url(#liquid)" opacity="0.6"/>
+
+  <path d="M 34 62 Q 51 68 68 62" fill="none" stroke="#8b6914" stroke-width="3" opacity="0.5" stroke-linecap="round"/>
+  <path d="M 35 80 Q 51 86 67 80" fill="none" stroke="#8b6914" stroke-width="3" opacity="0.5" stroke-linecap="round"/>
+
+  <path d="M 36 55 Q 37 72 37 88" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" opacity="0.25"/>
+
+  <ellipse cx="51" cy="50" rx="18" ry="6" fill="url(#foam)"/>
+
+  <circle cx="35" cy="51.5" r="3.5" fill="#fff8e7"/>
+  <circle cx="44" cy="53" r="4.5" fill="#fff8e7"/>
+  <circle cx="58" cy="52" r="4" fill="#fff8e7"/>
+  <circle cx="67" cy="51" r="2.5" fill="#fff8e7"/>
+
+  <g fill="white">
+      <circle cx="38" cy="51" r="2" opacity="0.5"/>
+      <circle cx="40" cy="52" r="1.5" opacity="0.4"/>
+      <circle cx="42" cy="50" r="2.5" opacity="0.6"/>
+      <circle cx="43" cy="52.5" r="1.8" opacity="0.5"/>
+      <circle cx="47" cy="49" r="3" opacity="0.6"/>
+      <circle cx="50" cy="51" r="2" opacity="0.4"/>
+      <circle cx="52" cy="48.5" r="3.5" opacity="0.5"/>
+      <circle cx="54" cy="50.5" r="2.5" opacity="0.55"/>
+      <circle cx="56" cy="49" r="2" opacity="0.45"/>
+      <circle cx="60" cy="51" r="2.8" opacity="0.6"/>
+      <circle cx="62" cy="50" r="1.5" opacity="0.4"/>
+      <circle cx="64" cy="51.5" r="2" opacity="0.5"/>
+      <circle cx="66" cy="50.5" r="1.2" opacity="0.4"/>
+  </g>
+
+  <circle cx="20" cy="30" r="1" fill="#d4a44a" opacity="0.4"/>
+  <circle cx="88" cy="20" r="0.8" fill="#d4a44a" opacity="0.3"/>
+</svg>
