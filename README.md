@@ -2,6 +2,8 @@
 
 SillyTavern runner for Android. Works on device with zero setup. Supports Android 8.0+ and arm64.
 
+<img src="pics/ST-android-app-icon-original.svg" alt="App icon" width="120">
+
 <img src="pics/ST-android-screenshot.png" alt="Screenshot" width="300">
 
 This is a personal project and is not affiliated with or endorsed by SillyTavern.
