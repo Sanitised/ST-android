@@ -19,6 +19,10 @@ It is intended primarily for basic on-device chatting; advanced workflows (for e
 - Bundles Node.js with minimal patches required to run on Android.
 - Release APKs are built in the pipeline and published automatically through immutable releases.
 
+## Installation
+
+Download the APK from [Releases](https://github.com/Sanitised/ST-android/releases/latest) (allow installs from your browser/files app if Android asks).
+
 ## Importing data from SillyTavern on Termux/PC
 
 The app accepts `.tar.gz`, `.tar`, and `.zip` archives. The format is detected automatically.
