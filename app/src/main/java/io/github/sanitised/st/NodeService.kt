@@ -7,7 +7,6 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.os.Binder
-import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -41,13 +40,14 @@ class NodeService : Service() {
 
     @Volatile
     private var process: Process? = null
-    private var status: NodeStatus = NodeStatus(NodeState.STOPPED, "Idle")
+    private var status: NodeStatus = NodeStatus(NodeState.STOPPED, "")
     @Volatile
     private var stopRequested = false
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        status = status.copy(message = getString(R.string.node_status_idle))
         notifyStatus(status)
     }
 
@@ -65,7 +65,7 @@ class NodeService : Service() {
             ACTION_START -> {
                 val port = intent.getIntExtra(EXTRA_PORT, status.port)
                 setPort(port)
-                if (ensureForeground("Starting")) {
+                if (ensureForeground(getString(R.string.node_status_starting))) {
                     startNodeAsync()
                 }
             }
@@ -87,9 +87,15 @@ class NodeService : Service() {
         val shouldStart = synchronized(this) {
             if (process != null) return@synchronized false
             if (status.state == NodeState.STARTING || status.state == NodeState.STOPPING) return@synchronized false
+            stopRequested = false
+            status = status.copy(
+                state = NodeState.STARTING,
+                message = getString(R.string.node_status_starting)
+            )
             true
         }
         if (!shouldStart) return
+        notifyStatus(status)
         serviceScope.launch { startNodeInternal() }
     }
 
@@ -98,32 +104,30 @@ class NodeService : Service() {
             if (process != null) {
                 return
             }
-            stopRequested = false
-            updateStatus(NodeState.STARTING, "Starting node")
         }
         val layout = try {
             val layoutResult = payload.ensureExtracted()
             if (layoutResult.isFailure) {
                 updateStatus(
                     NodeState.ERROR,
-                    layoutResult.exceptionOrNull()?.message ?: "Extraction failed"
+                    layoutResult.exceptionOrNull()?.message ?: getString(R.string.node_status_extraction_failed)
                 )
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 return
             }
             layoutResult.getOrThrow()
         } catch (e: Exception) {
-            updateStatus(NodeState.ERROR, e.message ?: "Extraction failed")
+            updateStatus(NodeState.ERROR, e.message ?: getString(R.string.node_status_extraction_failed))
             stopForeground(STOP_FOREGROUND_REMOVE)
             return
         }
         if (!layout.nodeBin.exists()) {
-            updateStatus(NodeState.ERROR, "Node binary not found. Add assets/node_payload/bin/<abi>/node")
+            updateStatus(NodeState.ERROR, getString(R.string.node_status_binary_not_found))
             stopForeground(STOP_FOREGROUND_REMOVE)
             return
         }
         if (stopRequested) {
-            updateStatus(NodeState.STOPPED, "Stopped")
+            updateStatus(NodeState.STOPPED, getString(R.string.node_status_stopped))
             stopForeground(STOP_FOREGROUND_REMOVE)
             return
         }
@@ -167,11 +171,11 @@ class NodeService : Service() {
             val startedProcess = builder.start()
             process = startedProcess
 
-            updateStatus(NodeState.RUNNING, "Running")
+            updateStatus(NodeState.RUNNING, getString(R.string.node_status_running))
             waitForExitAsync(startedProcess)
         } catch (e: Exception) {
             appendServiceLog(layout.logsDir, "start failed: ${e.message ?: "unknown error"}")
-            updateStatus(NodeState.ERROR, e.message ?: "Failed to start node")
+            updateStatus(NodeState.ERROR, e.message ?: getString(R.string.node_status_start_failed))
             stopForeground(STOP_FOREGROUND_REMOVE)
         }
     }
@@ -214,7 +218,7 @@ class NodeService : Service() {
         }
         val logFile = File(logsDir, "service.log")
         rotateLogIfNeeded(logFile, MAX_LOG_BYTES)
-        val line = "${System.currentTimeMillis()}: $message\n"
+        val line = formatServiceLogLine(message)
         logFile.appendText(line, Charsets.UTF_8)
     }
 
@@ -227,7 +231,7 @@ class NodeService : Service() {
             if (status.state == NodeState.STOPPED || status.state == NodeState.STOPPING) return
             stopRequested = true
             val current = process
-            updateStatus(NodeState.STOPPING, "Stopping")
+            updateStatus(NodeState.STOPPING, getString(R.string.node_status_stopping))
             current ?: return
         }
 
@@ -244,7 +248,7 @@ class NodeService : Service() {
                     process = null
                 }
             }
-            updateStatus(NodeState.STOPPED, "Stopped")
+            updateStatus(NodeState.STOPPED, getString(R.string.node_status_stopped))
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
@@ -264,12 +268,12 @@ class NodeService : Service() {
                 }
             }
             if (wasStopRequested) {
-                updateStatus(NodeState.STOPPED, "Stopped")
+                updateStatus(NodeState.STOPPED, getString(R.string.node_status_stopped))
             } else {
                 if (exitCode == 0) {
-                    updateStatus(NodeState.STOPPED, "Exited")
+                    updateStatus(NodeState.STOPPED, getString(R.string.node_status_exited))
                 } else {
-                    val message = "Exited with code ${exitCode ?: "?"}"
+                    val message = getString(R.string.node_status_exited_with_code, exitCode?.toString() ?: "?")
                     updateStatus(NodeState.ERROR, message)
                 }
             }
@@ -356,7 +360,7 @@ class NodeService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("SillyTavern Node")
+            .setContentTitle(getString(R.string.notification_title))
             .setContentText(contentText)
             .setContentIntent(openPending)
             .setSmallIcon(R.mipmap.ic_launcher)
@@ -364,7 +368,7 @@ class NodeService : Service() {
             .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setSilent(true)
-            .addAction(android.R.drawable.ic_media_pause, "Stop", stopPending)
+            .addAction(android.R.drawable.ic_media_pause, getString(R.string.notification_stop_action), stopPending)
             .build()
     }
 
@@ -373,17 +377,16 @@ class NodeService : Service() {
             startForeground(NOTIFICATION_ID, buildNotification(message))
             true
         } catch (e: Exception) {
-            updateStatus(NodeState.ERROR, e.message ?: "Foreground service not allowed")
+            updateStatus(NodeState.ERROR, e.message ?: getString(R.string.node_status_foreground_not_allowed))
             stopForeground(STOP_FOREGROUND_REMOVE)
             false
         }
     }
 
     private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Node service",
+            getString(R.string.notification_channel_name),
             NotificationManager.IMPORTANCE_LOW
         )
         channel.enableVibration(false)

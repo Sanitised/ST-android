@@ -17,6 +17,7 @@ captures/
 *.aab
 *.apk
 output-metadata.json
+.android
 
 # IntelliJ
 *.iml
@@ -41,5 +42,6 @@ google-services.json
 /app/src/main/assets/node_payload/bin/**/node
 /app/src/main/assets/node_payload/st_bundle.tar
 /app/src/main/assets/node_payload/st_bundle.tar.gz
+/app/src/main/assets/node_payload/npm.tar
 /app/src/main/assets/node_payload/manifest.json
 /app/src/main/assets/legal/sillytavern_package-lock.json

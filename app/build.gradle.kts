@@ -3,7 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-val fallbackVersionName = "0.2.0"
+val fallbackVersionName = "0.3.0"
 
 android {
     namespace = "io.github.sanitised.st"
@@ -71,6 +71,8 @@ android {
     buildTypes {
         debug {
             versionNameSuffix = "-dev"
+            applicationIdSuffix = ".dev"
+            resValue("string", "app_name", "ST dev")
         }
         release {
             isMinifyEnabled = false
@@ -117,7 +119,10 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.9.0")
     implementation("com.google.android.material:material:1.12.0")
     implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+    implementation("org.yaml:snakeyaml:2.2")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

@@ -45,3 +45,4 @@ jobs:
           files: out/*.apk
           name: ST-android ${{ github.ref_name }}
           generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}

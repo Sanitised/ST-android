@@ -20,6 +20,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
@@ -38,45 +39,48 @@ fun LegalScreen(
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState())
         ) {
-            Text(text = "Legal & Licenses", style = MaterialTheme.typography.titleLarge)
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "This app bundles SillyTavern and Node.js.",
-                style = MaterialTheme.typography.bodyMedium
+            SecondaryTopAppBar(
+                title = stringResource(R.string.legal_title),
+                onBack = onBack
             )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(text = "Links", style = MaterialTheme.typography.titleMedium)
-            Spacer(modifier = Modifier.height(8.dp))
-            Button(onClick = { onOpenUrl("https://github.com/Sanitised/ST-android") }) {
-                Text(text = "ST-android Repository")
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Button(onClick = { onOpenUrl("https://github.com/SillyTavern/SillyTavern") }) {
-                Text(text = "SillyTavern Repository")
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Button(onClick = { onOpenUrl("https://github.com/nodejs/node") }) {
-                Text(text = "Node.js Repository")
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(text = "Licenses", style = MaterialTheme.typography.titleMedium)
-            Spacer(modifier = Modifier.height(8.dp))
-            for (doc in legalDocs) {
-                Button(onClick = { onOpenLicense(doc) }) {
-                    Text(text = doc.title)
-                }
-                if (!doc.description.isNullOrBlank()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(text = doc.description, style = MaterialTheme.typography.bodySmall)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = stringResource(R.string.legal_description),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(text = stringResource(R.string.legal_links_title), style = MaterialTheme.typography.titleMedium)
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(onClick = { onOpenUrl("https://github.com/Sanitised/ST-android") }) {
+                    Text(text = stringResource(R.string.legal_link_st_android))
                 }
                 Spacer(modifier = Modifier.height(8.dp))
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = onBack) {
-                Text(text = "Back")
+                Button(onClick = { onOpenUrl("https://github.com/SillyTavern/SillyTavern") }) {
+                    Text(text = stringResource(R.string.legal_link_sillytavern))
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(onClick = { onOpenUrl("https://github.com/nodejs/node") }) {
+                    Text(text = stringResource(R.string.legal_link_node))
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(text = stringResource(R.string.legal_licenses_title), style = MaterialTheme.typography.titleMedium)
+                Spacer(modifier = Modifier.height(8.dp))
+                for (doc in legalDocs) {
+                    Button(onClick = { onOpenLicense(doc) }) {
+                        Text(text = doc.title)
+                    }
+                    if (!doc.description.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(text = doc.description, style = MaterialTheme.typography.bodySmall)
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
             }
         }
     }
@@ -88,12 +92,17 @@ fun LicenseTextScreen(
     doc: LegalDoc
 ) {
     val context = LocalContext.current
-    val textState = remember { mutableStateOf("Loading...") }
+    val textState = remember { mutableStateOf(context.getString(R.string.loading)) }
     LaunchedEffect(doc.assetPath) {
         val text = withContext(Dispatchers.IO) {
             runCatching {
                 context.assets.open(doc.assetPath).bufferedReader().use { it.readText() }
-            }.getOrElse { "Failed to load license: ${it.message ?: "unknown error"}" }
+            }.getOrElse {
+                context.getString(
+                    R.string.legal_license_load_failed,
+                    it.message ?: context.getString(R.string.unknown_error)
+                )
+            }
         }
         textState.value = text
     }
@@ -103,19 +112,18 @@ fun LicenseTextScreen(
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
-                .padding(16.dp)
         ) {
-            Text(text = doc.title, style = MaterialTheme.typography.titleLarge)
-            Spacer(modifier = Modifier.height(8.dp))
-            Button(onClick = onBack) { Text(text = "Back") }
-            Spacer(modifier = Modifier.height(12.dp))
+            SecondaryTopAppBar(
+                title = doc.title,
+                onBack = onBack
+            )
             Text(
                 text = textState.value,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(8.dp),
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
                 fontFamily = FontFamily.Monospace,
                 style = MaterialTheme.typography.bodySmall
             )

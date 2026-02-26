@@ -15,25 +15,53 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Button
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.io.File
 import java.nio.file.Files
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import org.yaml.snakeyaml.Yaml
+
+private sealed interface AppScreen {
+    object Home : AppScreen
+    object Logs : AppScreen
+    object Config : AppScreen
+    object Legal : AppScreen
+    object Settings : AppScreen
+    object ManageSt : AppScreen
+    data class License(val doc: LegalDoc) : AppScreen
+}
+
+private sealed interface PendingDialog {
+    object ResetToDefault : PendingDialog
+    object RemoveUserData : PendingDialog
+    data class ConfirmImport(val uri: Uri) : PendingDialog
+}
 
 class MainActivity : ComponentActivity() {
     private val nodeServiceState = mutableStateOf<NodeService?>(null)
@@ -58,16 +86,16 @@ class MainActivity : ComponentActivity() {
         maybeRequestNotificationPermission()
         val versionLabel = runCatching {
             val info = packageManager.getPackageInfo(packageName, 0)
-            info.versionName ?: "?"
-        }.getOrElse { "unknown" }
+            info.versionName ?: getString(R.string.unknown_short)
+        }.getOrElse { getString(R.string.unknown) }
         val bundledInfo = NodePayload(this).readManifestInfo()
         val stLabel = bundledInfo?.let {
             when {
-                !it.stVersion.isNullOrBlank() -> "SillyTavern ${it.stVersion}"
-                !it.stCommit.isNullOrBlank() -> "SillyTavern ${it.stCommit}"
-                else -> "SillyTavern unknown"
+                !it.stVersion.isNullOrBlank() -> getString(R.string.sillytavern_label, it.stVersion)
+                !it.stCommit.isNullOrBlank() -> getString(R.string.sillytavern_label, it.stCommit)
+                else -> getString(R.string.sillytavern_unknown)
             }
-        } ?: "SillyTavern unknown"
+        } ?: getString(R.string.sillytavern_unknown)
         val nodeLabel = bundledInfo?.let {
             val nodeValue = when {
                 !it.nodeTag.isNullOrBlank() -> it.nodeTag
@@ -75,24 +103,22 @@ class MainActivity : ComponentActivity() {
                 !it.nodeCommit.isNullOrBlank() -> it.nodeCommit
                 else -> null
             }
-            if (nodeValue.isNullOrBlank()) "Node unknown" else "Node $nodeValue"
-        } ?: "Node unknown"
+            if (nodeValue.isNullOrBlank()) getString(R.string.node_unknown) else getString(R.string.node_label, nodeValue)
+        } ?: getString(R.string.node_unknown)
         val symlinkSupported = isSymlinkSupported()
         setContent {
+            val viewModel: MainViewModel = viewModel()
             val statusState = remember { mutableStateOf(NodeStatus(NodeState.STOPPED, "Idle")) }
-            val showLogsState = remember { mutableStateOf(false) }
-            val showConfigState = remember { mutableStateOf(false) }
-            val showLegalState = remember { mutableStateOf(false) }
-            val showLicenseState = remember { mutableStateOf<LegalDoc?>(null) }
+            val currentScreen = remember { mutableStateOf<AppScreen>(AppScreen.Home) }
+            val autoOpenBrowserTriggeredForCurrentRun = remember { mutableStateOf(false) }
             val stdoutState = remember { mutableStateOf("") }
             val stderrState = remember { mutableStateOf("") }
             val serviceState = remember { mutableStateOf("") }
-            val backupStatusState = remember { mutableStateOf("") }
-            val pendingImportUri = remember { mutableStateOf<Uri?>(null) }
-            val showImportConfirm = remember { mutableStateOf(false) }
+            val pendingDialogState = remember { mutableStateOf<PendingDialog?>(null) }
             val notificationGrantedState = remember { mutableStateOf(isNotificationPermissionGranted()) }
             val lifecycleOwner = LocalLifecycleOwner.current
             val scope = rememberCoroutineScope()
+            val snackbarHostState = remember { SnackbarHostState() }
             val listener = remember {
                 object : NodeStatusListener {
                     override fun onStatus(status: NodeStatus) {
@@ -105,6 +131,7 @@ class MainActivity : ComponentActivity() {
 
             val service = nodeServiceState.value
             DisposableEffect(service) {
+                viewModel.nodeService = service
                 if (service != null) {
                     service.registerListener(listener)
                 }
@@ -122,10 +149,10 @@ class MainActivity : ComponentActivity() {
                 onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
             }
 
-            LaunchedEffect(showLogsState.value) {
-                if (!showLogsState.value) return@LaunchedEffect
+            LaunchedEffect(currentScreen.value) {
+                if (currentScreen.value !is AppScreen.Logs) return@LaunchedEffect
                 val paths = AppPaths(this@MainActivity)
-                while (showLogsState.value) {
+                while (currentScreen.value is AppScreen.Logs) {
                     val logsDir = paths.logsDir
                     val stdoutFile = File(logsDir, "node_stdout.log")
                     val stderrFile = File(logsDir, "node_stderr.log")
@@ -136,165 +163,348 @@ class MainActivity : ComponentActivity() {
                     delay(1000)
                 }
             }
+            LaunchedEffect(Unit) {
+                viewModel.maybeAutoCheckForUpdates()
+            }
+            LaunchedEffect(viewModel) {
+                viewModel.snackbarMessages.collectLatest { message ->
+                    snackbarHostState.showSnackbar(message)
+                }
+            }
+            LaunchedEffect(statusState.value.state) {
+                if (statusState.value.state != NodeState.RUNNING) {
+                    autoOpenBrowserTriggeredForCurrentRun.value = false
+                }
+            }
+            val showAutoCheckOptInPrompt = viewModel.shouldShowAutoCheckOptInPrompt()
+            val showUpdatePrompt = viewModel.shouldShowUpdatePrompt()
+            val isUpdateReadyToInstall = viewModel.isAvailableUpdateDownloaded()
 
             val legalDocs = remember {
                 listOf(
                     LegalDoc(
-                        title = "App license (AGPL-3.0)",
+                        title = getString(R.string.legal_doc_app_license_title),
                         assetPath = "legal/sillytavern_AGPL-3.0.txt",
-                        description = "Applies to this app and SillyTavern."
+                        description = getString(R.string.legal_doc_app_license_description)
                     ),
                     LegalDoc(
-                        title = "Node.js license (MIT)",
+                        title = getString(R.string.legal_doc_node_license_title),
                         assetPath = "legal/node_MIT.txt",
-                        description = "Includes Termux-derived Node patches."
+                        description = getString(R.string.legal_doc_node_license_description)
                     ),
                     LegalDoc(
-                        title = "AndroidX / Compose / Material / Kotlin license (Apache-2.0)",
+                        title = getString(R.string.legal_doc_android_license_title),
                         assetPath = "legal/apache-2.0.txt",
                     ),
                     LegalDoc(
-                        title = "SillyTavern Dependencies and licenses (package-lock.json)",
+                        title = getString(R.string.legal_doc_st_dependencies_title),
                         assetPath = "legal/sillytavern_package-lock.json"
                     )
                 )
             }
 
-            if (showLogsState.value) {
-                BackHandler { showLogsState.value = false }
-                LogsScreen(
-                    onBack = { showLogsState.value = false },
-                    stdoutLog = stdoutState.value,
-                    stderrLog = stderrState.value,
-                    serviceLog = serviceState.value
-                )
-            } else if (showLicenseState.value != null) {
-                val doc = showLicenseState.value
-                if (doc != null) {
-                    BackHandler { showLicenseState.value = null }
-                    LicenseTextScreen(
-                        onBack = { showLicenseState.value = null },
-                        doc = doc
+            // Launchers must live at the top level, outside any conditional branches
+            val exportLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.CreateDocument("application/gzip")
+            ) { uri ->
+                if (uri == null) return@rememberLauncherForActivityResult
+                viewModel.export(uri)
+            }
+            val importLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.OpenDocument()
+            ) { uri ->
+                if (uri == null) return@rememberLauncherForActivityResult
+                pendingDialogState.value = PendingDialog.ConfirmImport(uri)
+            }
+            val customZipLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.OpenDocument()
+            ) { uri ->
+                if (uri == null) return@rememberLauncherForActivityResult
+                viewModel.installCustomZip(uri)
+            }
+            val triggerExport: () -> Unit = {
+                val stamp = LocalDateTime.now()
+                    .format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
+                exportLauncher.launch("sillytavern-backup-$stamp.tar.gz")
+            }
+            val triggerImport: () -> Unit = {
+                importLauncher.launch(
+                    arrayOf(
+                        "application/zip",
+                        "application/x-zip-compressed",
+                        "application/gzip",
+                        "application/x-gzip",
+                        "application/octet-stream",
+                        "application/x-tar"
                     )
-                }
-            } else if (showLegalState.value) {
-                BackHandler { showLegalState.value = false }
-                LegalScreen(
-                    onBack = { showLegalState.value = false },
-                    onOpenUrl = { url -> openUrl(url) },
-                    legalDocs = legalDocs,
-                    onOpenLicense = { doc -> showLicenseState.value = doc }
                 )
-            } else if (showConfigState.value) {
-                BackHandler { showConfigState.value = false }
-                ConfigScreen(
-                    onBack = { showConfigState.value = false },
-                    onOpenDocs = { openConfigDocs() },
-                    canEdit = statusState.value.state == NodeState.STOPPED || statusState.value.state == NodeState.ERROR,
-                    configFile = AppPaths(this).configFile
-                )
-            } else {
-                val exportLauncher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.CreateDocument("application/gzip")
-                ) { uri ->
-                    if (uri == null) return@rememberLauncherForActivityResult
-                    backupStatusState.value = "Exporting..."
-                    scope.launch {
-                        val result = withContext(Dispatchers.IO) {
-                            NodeBackup.exportToUri(this@MainActivity, uri)
-                        }
-                        backupStatusState.value = result.getOrElse { "Export failed: ${it.message ?: "unknown error"}" }
+            }
+
+            Box(modifier = Modifier.fillMaxSize()) {
+                when (val screen = currentScreen.value) {
+                    AppScreen.Logs -> {
+                        BackHandler { currentScreen.value = AppScreen.Home }
+                        LogsScreen(
+                            onBack = { currentScreen.value = AppScreen.Home },
+                            stdoutLog = stdoutState.value,
+                            stderrLog = stderrState.value,
+                            serviceLog = serviceState.value
+                        )
+                    }
+
+                    is AppScreen.License -> {
+                        BackHandler { currentScreen.value = AppScreen.Legal }
+                        LicenseTextScreen(
+                            onBack = { currentScreen.value = AppScreen.Legal },
+                            doc = screen.doc
+                        )
+                    }
+
+                    AppScreen.Legal -> {
+                        BackHandler { currentScreen.value = AppScreen.Home }
+                        LegalScreen(
+                            onBack = { currentScreen.value = AppScreen.Home },
+                            onOpenUrl = { url -> openUrl(url) },
+                            legalDocs = legalDocs,
+                            onOpenLicense = { doc -> currentScreen.value = AppScreen.License(doc) }
+                        )
+                    }
+
+                    AppScreen.Config -> {
+                        ConfigScreen(
+                            onBack = { currentScreen.value = AppScreen.Home },
+                            onOpenDocs = { openConfigDocs() },
+                            canEdit = statusState.value.state == NodeState.STOPPED || statusState.value.state == NodeState.ERROR,
+                            configFile = AppPaths(this@MainActivity).configFile,
+                            onShowMessage = { message -> viewModel.showTransientMessage(message) }
+                        )
+                    }
+
+                    AppScreen.Settings -> {
+                        BackHandler { currentScreen.value = AppScreen.Home }
+                        SettingsScreen(
+                            onBack = { currentScreen.value = AppScreen.Home },
+                            autoCheckEnabled = viewModel.autoCheckForUpdates.value,
+                            onAutoCheckChanged = { enabled -> viewModel.setAutoCheckForUpdates(enabled) },
+                            autoOpenBrowserEnabled = viewModel.autoOpenBrowserWhenReady.value,
+                            onAutoOpenBrowserChanged = { enabled -> viewModel.setAutoOpenBrowserWhenReady(enabled) },
+                            channel = viewModel.updateChannel.value,
+                            onChannelChanged = { channel -> viewModel.setUpdateChannel(channel) },
+                            onCheckNow = { viewModel.checkForUpdates("manual") },
+                            isChecking = viewModel.isCheckingForUpdates.value,
+                            showUpdatePrompt = showUpdatePrompt,
+                            updateVersionLabel = viewModel.availableUpdateVersionLabel(),
+                            updateDetails = viewModel.updateBannerMessage.value,
+                            isDownloadingUpdate = viewModel.isDownloadingUpdate.value,
+                            downloadProgressPercent = viewModel.downloadProgressPercent.value,
+                            isUpdateReadyToInstall = isUpdateReadyToInstall,
+                            onUpdatePrimary = {
+                                if (isUpdateReadyToInstall) {
+                                    viewModel.installDownloadedUpdate(this@MainActivity)
+                                } else {
+                                    viewModel.startAvailableUpdateDownload()
+                                }
+                            },
+                            onUpdateDismiss = { viewModel.dismissAvailableUpdatePrompt() },
+                            onCancelUpdateDownload = { viewModel.cancelUpdateDownload() }
+                        )
+                    }
+
+                    AppScreen.ManageSt -> {
+                        BackHandler { currentScreen.value = AppScreen.Home }
+                        ManageStScreen(
+                            onBack = { currentScreen.value = AppScreen.Home },
+                            isCustomInstalled = viewModel.isCustomInstalled.value,
+                            customInstalledLabel = viewModel.customInstallLabel.value,
+                            serverRunning = statusState.value.state == NodeState.RUNNING ||
+                                    statusState.value.state == NodeState.STARTING,
+                            busyMessage = viewModel.busyMessage,
+                            onExport = triggerExport,
+                            onImport = triggerImport,
+                            customRepoInput = viewModel.customRepoInput.value,
+                            onCustomRepoInputChanged = { viewModel.setCustomRepoInput(it) },
+                            onLoadRepoRefs = { viewModel.loadCustomRepoRefs() },
+                            isLoadingRepoRefs = viewModel.isLoadingCustomRefs.value,
+                            customRepoValidationMessage = viewModel.customRepoValidationMessage.value,
+                            featuredRefs = viewModel.customFeaturedRefs.value,
+                            allRefs = viewModel.customAllRefs.value,
+                            selectedRefKey = viewModel.selectedCustomRefKey.value,
+                            onSelectRepoRef = { key -> viewModel.selectCustomRepoRef(key) },
+                            onDownloadAndInstallRef = { viewModel.startCustomRepoInstall() },
+                            customInstallValidationMessage = viewModel.customInstallValidationMessage.value,
+                            showBackupOperationCard = viewModel.backupOperationCard.value.visible,
+                            backupOperationTitle = viewModel.backupOperationCard.value.title,
+                            backupOperationDetails = viewModel.backupOperationCard.value.details,
+                            backupOperationProgressPercent = viewModel.backupOperationCard.value.progressPercent,
+                            backupOperationAnchor = viewModel.backupOperationCardAnchor.value,
+                            showCustomOperationCard = viewModel.customOperationCard.value.visible,
+                            customOperationTitle = viewModel.customOperationCard.value.title,
+                            customOperationDetails = viewModel.customOperationCard.value.details,
+                            customOperationProgressPercent = viewModel.customOperationCard.value.progressPercent,
+                            customOperationCancelable = viewModel.customOperationCard.value.cancelable,
+                            customOperationAnchor = viewModel.customOperationCardAnchor.value,
+                            onCancelCustomOperation = { viewModel.cancelCustomSourceDownload() },
+                            onLoadCustomZip = {
+                                customZipLauncher.launch(
+                                    arrayOf(
+                                        "application/zip",
+                                        "application/x-zip-compressed",
+                                        "application/octet-stream"
+                                    )
+                                )
+                            },
+                            onResetToDefault = { pendingDialogState.value = PendingDialog.ResetToDefault },
+                            onRemoveUserData = { pendingDialogState.value = PendingDialog.RemoveUserData }
+                        )
+                    }
+
+                    AppScreen.Home -> {
+                        STAndroidApp(
+                            status = statusState.value,
+                            busyMessage = viewModel.busyMessage,
+                            onStart = { startNode() },
+                            onStop = { stopNode() },
+                            onOpen = { openNodeUi(statusState.value.port) },
+                            autoOpenBrowserWhenReady = viewModel.autoOpenBrowserWhenReady.value,
+                            autoOpenBrowserTriggeredForCurrentRun = autoOpenBrowserTriggeredForCurrentRun.value,
+                            onAutoOpenBrowserTriggered = { autoOpenBrowserTriggeredForCurrentRun.value = true },
+                            onShowLogs = { currentScreen.value = AppScreen.Logs },
+                            onOpenNotificationSettings = { openNotificationSettings() },
+                            onEditConfig = { currentScreen.value = AppScreen.Config },
+                            showNotificationPrompt = !notificationGrantedState.value,
+                            versionLabel = versionLabel,
+                            stLabel = if (viewModel.isCustomInstalled.value) {
+                                val customLabel = viewModel.customInstallLabel.value
+                                if (customLabel.isNullOrBlank()) {
+                                    getString(R.string.sillytavern_custom_version)
+                                } else {
+                                    getString(R.string.sillytavern_custom_with_label, customLabel)
+                                }
+                            } else stLabel,
+                            nodeLabel = nodeLabel,
+                            symlinkSupported = symlinkSupported,
+                            onShowLegal = { currentScreen.value = AppScreen.Legal },
+                            showAutoCheckOptInPrompt = showAutoCheckOptInPrompt,
+                            onEnableAutoCheck = { viewModel.acceptAutoCheckOptInPrompt() },
+                            onLaterAutoCheck = { viewModel.dismissAutoCheckOptInPrompt() },
+                            showUpdatePrompt = showUpdatePrompt,
+                            updateVersionLabel = viewModel.availableUpdateVersionLabel(),
+                            updateDetails = viewModel.updateBannerMessage.value,
+                            isDownloadingUpdate = viewModel.isDownloadingUpdate.value,
+                            downloadProgressPercent = viewModel.downloadProgressPercent.value,
+                            isUpdateReadyToInstall = isUpdateReadyToInstall,
+                            onUpdatePrimary = {
+                                if (isUpdateReadyToInstall) {
+                                    viewModel.installDownloadedUpdate(this@MainActivity)
+                                } else {
+                                    viewModel.startAvailableUpdateDownload()
+                                }
+                            },
+                            onUpdateDismiss = { viewModel.dismissAvailableUpdatePrompt() },
+                            onCancelUpdateDownload = { viewModel.cancelUpdateDownload() },
+                            showBackupOperationCard = viewModel.backupOperationCard.value.visible,
+                            backupOperationTitle = viewModel.backupOperationCard.value.title,
+                            backupOperationDetails = viewModel.backupOperationCard.value.details,
+                            backupOperationProgressPercent = viewModel.backupOperationCard.value.progressPercent,
+                            showCustomOperationCard = viewModel.customOperationCard.value.visible,
+                            customOperationTitle = viewModel.customOperationCard.value.title,
+                            customOperationDetails = viewModel.customOperationCard.value.details,
+                            customOperationProgressPercent = viewModel.customOperationCard.value.progressPercent,
+                            customOperationCancelable = viewModel.customOperationCard.value.cancelable,
+                            onCancelCustomOperation = { viewModel.cancelCustomSourceDownload() },
+                            onShowSettings = { currentScreen.value = AppScreen.Settings },
+                            onShowManageSt = { currentScreen.value = AppScreen.ManageSt }
+                        )
                     }
                 }
-                val importLauncher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.OpenDocument()
-                ) { uri ->
-                    if (uri == null) return@rememberLauncherForActivityResult
-                    pendingImportUri.value = uri
-                    showImportConfirm.value = true
-                }
-                STAndroidApp(
-                    status = statusState.value,
-                    onStart = { startNode() },
-                    onStop = { stopNode() },
-                    onOpen = { openNodeUi(statusState.value.port) },
-                    onShowLogs = { showLogsState.value = true },
-                    onOpenNotificationSettings = { openNotificationSettings() },
-                    onEditConfig = { showConfigState.value = true },
-                    showNotificationPrompt = !notificationGrantedState.value,
-                    onExport = {
-                        val stamp = LocalDateTime.now()
-                            .format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
-                        exportLauncher.launch("sillytavern-backup-$stamp.tar.gz")
-                    },
-                    onImport = {
-                        importLauncher.launch(
-                            arrayOf(
-                                "application/gzip",
-                                "application/x-gzip",
-                                "application/octet-stream",
-                                "application/x-tar"
-                            )
-                        )
-                    },
-                    backupStatus = backupStatusState.value,
-                    versionLabel = versionLabel,
-                    stLabel = stLabel,
-                    nodeLabel = nodeLabel,
-                    symlinkSupported = symlinkSupported,
-                    onShowLegal = { showLegalState.value = true }
-                )
-                if (showImportConfirm.value) {
-                    androidx.compose.material3.AlertDialog(
-                        onDismissRequest = { showImportConfirm.value = false },
-                        title = { Text(text = "Import backup?") },
-                        text = {
-                            Text(
-                                text = "YOUR EXISTING DATA WILL BE OVERWRITTEN. " +
-                                        "Make sure the server is stopped before importing."
-                            )
-                        },
-                        confirmButton = {
-                            Button(onClick = {
-                                val uri = pendingImportUri.value
-                                showImportConfirm.value = false
-                                pendingImportUri.value = null
-                                if (uri == null) return@Button
-                                backupStatusState.value = "Importing..."
-                                scope.launch {
-                                    val importResult = withContext(Dispatchers.IO) {
-                                        NodeBackup.importFromUri(this@MainActivity, uri)
-                                    }
-                                    val postInstallResult = if (importResult.isSuccess) {
-                                        val serviceResult = nodeServiceState.value?.runPostInstallNow()
-                                        serviceResult ?: Result.failure(IllegalStateException("Service not available"))
-                                    } else {
-                                        Result.success(Unit)
-                                    }
-                                    backupStatusState.value = when {
-                                        importResult.isFailure ->
-                                            "Import failed: ${importResult.exceptionOrNull()?.message ?: "unknown error"}"
 
-                                        postInstallResult.isFailure ->
-                                            "Import complete, post-install failed: ${postInstallResult.exceptionOrNull()?.message ?: "unknown error"}"
-
-                                        else -> "Import complete"
-                                    }
+                when (val dialog = pendingDialogState.value) {
+                    PendingDialog.ResetToDefault -> {
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = { pendingDialogState.value = null },
+                            title = { Text(text = stringResource(R.string.dialog_reset_title)) },
+                            text = {
+                                Text(
+                                    text = stringResource(R.string.dialog_reset_body)
+                                )
+                            },
+                            confirmButton = {
+                                Button(onClick = {
+                                    pendingDialogState.value = null
+                                    viewModel.resetToDefault()
+                                }) {
+                                    Text(text = stringResource(R.string.reset))
                                 }
-                            }) {
-                                Text(text = "Import")
+                            },
+                            dismissButton = {
+                                Button(onClick = { pendingDialogState.value = null }) {
+                                    Text(text = stringResource(R.string.cancel))
+                                }
                             }
-                        },
-                        dismissButton = {
-                            Button(onClick = {
-                                showImportConfirm.value = false
-                                pendingImportUri.value = null
-                            }) {
-                                Text(text = "Cancel")
+                        )
+                    }
+
+                    PendingDialog.RemoveUserData -> {
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = { pendingDialogState.value = null },
+                            title = { Text(text = stringResource(R.string.dialog_remove_data_title)) },
+                            text = {
+                                Text(
+                                    text = stringResource(R.string.dialog_remove_data_body)
+                                )
+                            },
+                            confirmButton = {
+                                Button(onClick = {
+                                    pendingDialogState.value = null
+                                    viewModel.removeUserData()
+                                }) {
+                                    Text(text = stringResource(R.string.remove))
+                                }
+                            },
+                            dismissButton = {
+                                Button(onClick = { pendingDialogState.value = null }) {
+                                    Text(text = stringResource(R.string.cancel))
+                                }
                             }
-                        }
-                    )
+                        )
+                    }
+
+                    is PendingDialog.ConfirmImport -> {
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = { pendingDialogState.value = null },
+                            title = { Text(text = stringResource(R.string.dialog_import_title)) },
+                            text = {
+                                Text(
+                                    text = stringResource(R.string.dialog_import_body)
+                                )
+                            },
+                            confirmButton = {
+                                Button(onClick = {
+                                    val importUri = dialog.uri
+                                    pendingDialogState.value = null
+                                    viewModel.import(importUri)
+                                }) {
+                                    Text(text = stringResource(R.string.import_action))
+                                }
+                            },
+                            dismissButton = {
+                                Button(onClick = { pendingDialogState.value = null }) {
+                                    Text(text = stringResource(R.string.cancel))
+                                }
+                            }
+                        )
+                    }
+
+                    null -> Unit
                 }
+
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                )
             }
         }
     }
@@ -350,14 +560,16 @@ class MainActivity : ComponentActivity() {
         val configFile = AppPaths(this).configFile
         if (!configFile.exists()) return DEFAULT_PORT
         return try {
-            val port = configFile.useLines { lines ->
-                val regex = Regex("^port\\s*:\\s*(\\d+)\\s*$")
-                lines.map { it.substringBefore("#") }
-                    .mapNotNull { regex.find(it)?.groupValues?.getOrNull(1) }
-                    .firstOrNull()
-                    ?.toIntOrNull()
+            val yamlRoot = configFile.inputStream().bufferedReader(Charsets.UTF_8).use { reader ->
+                Yaml().load<Any?>(reader)
             }
-            if (port != null && port in 1..65535) port else DEFAULT_PORT
+            val rawPort = (yamlRoot as? Map<*, *>)?.get("port")
+            val parsedPort = when (rawPort) {
+                is Number -> rawPort.toInt()
+                is String -> rawPort.trim().toIntOrNull()
+                else -> null
+            }
+            parsedPort?.takeIf { it in 1..65535 } ?: DEFAULT_PORT
         } catch (_: Exception) {
             DEFAULT_PORT
         }

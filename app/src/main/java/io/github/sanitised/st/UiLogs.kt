@@ -1,6 +1,8 @@
 package io.github.sanitised.st
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,17 +12,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -39,32 +43,30 @@ fun LogsScreen(
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(text = "Logs")
-            Spacer(modifier = Modifier.height(8.dp))
-            Button(onClick = onBack) { Text(text = "Back") }
-            Spacer(modifier = Modifier.height(12.dp))
+            SecondaryTopAppBar(
+                title = stringResource(R.string.logs_title),
+                onBack = onBack
+            )
             Column(
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 LogSection(
-                    label = "stdout",
+                    label = stringResource(R.string.logs_stdout_label),
                     text = stdoutLog,
                     modifier = Modifier.weight(0.45f)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 LogSection(
-                    label = "stderr",
+                    label = stringResource(R.string.logs_stderr_label),
                     text = stderrLog,
                     modifier = Modifier.weight(0.35f)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 LogSection(
-                    label = "service",
+                    label = stringResource(R.string.logs_service_label),
                     text = serviceLog,
                     modifier = Modifier.weight(0.20f)
                 )
@@ -79,45 +81,60 @@ private fun LogSection(
     text: String,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(text = label, style = MaterialTheme.typography.labelMedium)
-        LogPanel(
-            text = text,
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-        )
-        CopyButton(label = "Copy $label", text = text)
-    }
-}
-
-@Composable
-private fun LogPanel(
-    text: String,
-    modifier: Modifier = Modifier
-) {
     val scrollState = rememberScrollState()
+    val scrollbarColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
     LaunchedEffect(text) {
         scrollState.scrollTo(scrollState.maxValue)
     }
-    Text(
-        text = if (text.isNotEmpty()) text else "(empty)",
-        modifier = modifier
-            .verticalScroll(scrollState)
-            .padding(8.dp),
-        fontFamily = FontFamily.Monospace,
-        style = MaterialTheme.typography.bodySmall
-    )
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            CopyButton(text = text)
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            shape = MaterialTheme.shapes.small,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh
+        ) {
+            Box(modifier = Modifier.fillMaxSize().verticalScrollbar(scrollState, scrollbarColor)) {
+                Text(
+                    text = if (text.isNotEmpty()) text else stringResource(R.string.logs_empty),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(scrollState)
+                        .padding(10.dp),
+                    fontFamily = FontFamily.Monospace,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (text.isNotEmpty())
+                        MaterialTheme.colorScheme.onSurface
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
 }
 
 @Composable
-private fun CopyButton(label: String, text: String) {
+private fun CopyButton(text: String) {
     val clipboard = LocalClipboardManager.current
-    Button(onClick = { clipboard.setText(AnnotatedString(text)) }, enabled = text.isNotEmpty()) {
-        Text(text = label)
+    TextButton(
+        onClick = { clipboard.setText(AnnotatedString(text)) },
+        enabled = text.isNotEmpty()
+    ) {
+        Text(text = stringResource(R.string.copy), style = MaterialTheme.typography.labelMedium)
     }
 }
 

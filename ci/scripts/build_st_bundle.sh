@@ -50,6 +50,21 @@ fi
 cp -f "${STAGE_DIR}/package-lock.json" "${LEGAL_ASSET_DIR}/sillytavern_package-lock.json"
 
 tar -C "${OUT_DIR}" -cf "${ASSET_DIR}/st_bundle.tar" st
+# Bundle npm for runtime use (needed for custom ST version installation)
+NPM_DIR=""
+if command -v npm &>/dev/null; then
+  NPM_PREFIX=$(npm config get prefix 2>/dev/null || echo "")
+  if [ -n "$NPM_PREFIX" ] && [ -d "${NPM_PREFIX}/lib/node_modules/npm" ]; then
+    NPM_DIR="${NPM_PREFIX}/lib/node_modules/npm"
+  fi
+fi
+if [ -n "$NPM_DIR" ] && [ -f "${NPM_DIR}/bin/npm-cli.js" ]; then
+  echo "Bundling npm from ${NPM_DIR}"
+  tar -C "$(dirname "${NPM_DIR}")" -cf "${ASSET_DIR}/npm.tar" "$(basename "${NPM_DIR}")"
+else
+  echo "Warning: npm package not found, custom ST installation will not be available in this build"
+fi
+
 export ROOT_DIR="${ROOT_DIR}"
 export ST_SAFE_DIR="${ST_DIR}"
 

@@ -1,26 +1,40 @@
 # ST-android
 
-SillyTavern app for Android. Works on device with zero setup. Supports Android 8.0+ and arm64.
+SillyTavern runner for Android. Works on device with zero setup. Supports Android 8.0+ and arm64.
+
+<img src="pics/ST-android-app-icon-original.svg" alt="App icon" width="120">
 
 <img src="pics/ST-android-screenshot.png" alt="Screenshot" width="300">
 
 This is a personal project and is not affiliated with or endorsed by SillyTavern.
-It is intended primarily for basic on-device chatting; advanced workflows (for example, some extensions) may not work.
+It is intended primarily for basic on-device chatting; advanced workflows (for example, extensions) may not work.
 
 ## Privacy
 
-- The app makes no network requests beyond what SillyTavern itself does.
 - No telemetry of any kind.
 - Unlike Termux, app works in Private Space/Secure Folder/Secondary profiles.
+- Minimal network calls: opt-in Github release checks, npm installs for custom ST versions. All other traffic comes from SillyTavern itself.
 - All chats, characters, settings stay local unless you decide to export them manually and share with others.
 - Bundles SillyTavern source code without modifications.
 - Bundles Node.js with minimal patches required to run on Android.
-- The codebase is intentionally small and easy to review manually or with a coding agent.
 - Release APKs are built in the pipeline and published automatically through immutable releases.
 
 ## Importing data from SillyTavern on Termux/PC
 
-Pack your SillyTavern `data/` folder (and optionally `config.yaml`) into an `.tar.gz` archive with this structure:
+The app accepts `.tar.gz`, `.tar`, and `.zip` archives. The format is detected automatically.
+
+### Quick export (Termux or Linux)
+
+Run this one-liner:
+
+```bash
+bash <(curl -sSf https://raw.githubusercontent.com/Sanitised/ST-android/master/tools/export_to_st_android.sh)
+```
+If your SillyTavern folder is not in a standard location, first do `cd ./my-sillytavern`.
+
+### Manual export
+
+The archive must have this structure:
 
 ```
 st_backup/
@@ -28,15 +42,17 @@ st_backup/
 └── data/
 ```
 
-Termux commands:
 ```bash
 mkdir st_backup
 cp /path/to/sillytavern/config.yaml st_backup/
 cp -r /path/to/sillytavern/data st_backup/
 tar -czf st_backup.tar.gz st_backup/
-# Getting archive out of Termix
-termux-setup-storage
-# Grant storage permission
+```
+
+On Termux, copy the archive to Downloads so the app can reach it:
+
+```bash
+termux-setup-storage   # one-time permission grant
 cp st_backup.tar.gz ~/storage/downloads/
 ```
 
