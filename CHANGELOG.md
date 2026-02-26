@@ -2,7 +2,7 @@
 
 ## 0.3.1
 
-- Added button in setting to set unrestricted battery use
+- Added UI to set unrestricted battery use
 - Improved archive handling during import/export
 
 ## 0.3.0
