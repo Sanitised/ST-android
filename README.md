@@ -26,6 +26,7 @@ Download the APK from [Releases](https://github.com/Sanitised/ST-android/release
 ## Importing data from SillyTavern on Termux/PC
 
 The app accepts `.tar.gz`, `.tar`, and `.zip` archives. The format is detected automatically.
+Import the backup archive file (for example, `st_backup.tar.gz`).
 
 ### Quick export (Termux or Linux)
 
@@ -60,7 +61,7 @@ termux-setup-storage   # one-time permission grant
 cp st_backup.tar.gz ~/storage/downloads/
 ```
 
-Then stop the server in the app and use **Import Data**.
+Then stop the server in the app, tap **Manage ST**, **Import Data** and select the backup archive (for example, `st_backup.tar.gz`).
 
 ## Changelog
 
