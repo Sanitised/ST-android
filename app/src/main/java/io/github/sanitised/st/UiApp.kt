@@ -50,8 +50,10 @@ fun STAndroidApp(
     onAutoOpenBrowserTriggered: () -> Unit,
     onShowLogs: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
+    onOpenBatterySettings: () -> Unit,
     onEditConfig: () -> Unit,
     showNotificationPrompt: Boolean,
+    showBatteryPrompt: Boolean,
     versionLabel: String,
     stLabel: String,
     nodeLabel: String,
@@ -60,6 +62,7 @@ fun STAndroidApp(
     showAutoCheckOptInPrompt: Boolean,
     onEnableAutoCheck: () -> Unit,
     onLaterAutoCheck: () -> Unit,
+    onDismissBatteryPrompt: () -> Unit,
     showUpdatePrompt: Boolean,
     updateVersionLabel: String,
     updateDetails: String,
@@ -234,6 +237,14 @@ fun STAndroidApp(
                             onOpenSettings = onOpenNotificationSettings
                         )
                     }
+                    if (showBatteryPrompt) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        BatteryOptimizationCard(
+                            visible = true,
+                            onSet = onOpenBatterySettings,
+                            onDismiss = onDismissBatteryPrompt
+                        )
+                    }
                     if (showUpdatePrompt) {
                         Spacer(modifier = Modifier.height(16.dp))
                         UpdatePromptCard(
@@ -345,8 +356,10 @@ private fun STAndroidAppPreview() {
         onAutoOpenBrowserTriggered = {},
         onShowLogs = {},
         onOpenNotificationSettings = {},
+        onOpenBatterySettings = {},
         onEditConfig = {},
         showNotificationPrompt = false,
+        showBatteryPrompt = false,
         versionLabel = "0.3.1-dev",
         stLabel = "SillyTavern 1.12.3",
         nodeLabel = "Node v24.13.0",
@@ -355,6 +368,7 @@ private fun STAndroidAppPreview() {
         showAutoCheckOptInPrompt = false,
         onEnableAutoCheck = {},
         onLaterAutoCheck = {},
+        onDismissBatteryPrompt = {},
         showUpdatePrompt = false,
         updateVersionLabel = "",
         updateDetails = "",

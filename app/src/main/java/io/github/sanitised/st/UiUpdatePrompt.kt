@@ -189,6 +189,52 @@ fun NotificationPermissionCard(
 }
 
 @Composable
+fun BatteryOptimizationCard(
+    visible: Boolean,
+    onSet: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    if (!visible) return
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        ),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp)) {
+            Text(
+                text = stringResource(R.string.battery_prompt_title),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = stringResource(R.string.battery_prompt_body),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = onSet,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(text = stringResource(R.string.battery_prompt_set))
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(text = stringResource(R.string.dismiss))
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun CustomSourceDownloadCard(
     visible: Boolean,
     title: String,

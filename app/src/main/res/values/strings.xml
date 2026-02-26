@@ -6,6 +6,10 @@
     <string name="auto_check_opt_in_body">We can check on app launch, no more than once per day.</string>
     <string name="auto_check_opt_in_title">Enable automatic update checks?</string>
     <string name="back">Back</string>
+    <string name="battery_prompt_body">Android may stop the background server to save battery. Set this app to unrestricted to reduce random shutdowns.</string>
+    <string name="battery_prompt_dismissed">If the server is shutting down in background, change battery mode to unrestricted in Settings.</string>
+    <string name="battery_prompt_set">Set</string>
+    <string name="battery_prompt_title">Keep Server Running in Background</string>
     <string name="busy_downloading_custom_source">Downloading custom ST source…</string>
     <string name="busy_exporting_data">Exporting data…</string>
     <string name="busy_importing_data">Importing data…</string>

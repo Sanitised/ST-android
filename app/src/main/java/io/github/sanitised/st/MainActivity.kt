@@ -182,6 +182,9 @@ class MainActivity : ComponentActivity() {
                 }
             }
             val showAutoCheckOptInPrompt = viewModel.shouldShowAutoCheckOptInPrompt()
+            val showBatteryPrompt = viewModel.shouldShowBatteryPrompt(
+                isBatteryUnrestricted = batteryUnrestrictedState.value
+            )
             val showUpdatePrompt = viewModel.shouldShowUpdatePrompt()
             val isUpdateReadyToInstall = viewModel.isAvailableUpdateDownloaded()
 
@@ -377,8 +380,10 @@ class MainActivity : ComponentActivity() {
                             onAutoOpenBrowserTriggered = { autoOpenBrowserTriggeredForCurrentRun.value = true },
                             onShowLogs = { currentScreen.value = AppScreen.Logs },
                             onOpenNotificationSettings = { openNotificationSettings() },
+                            onOpenBatterySettings = { openBatteryOptimizationSettings() },
                             onEditConfig = { currentScreen.value = AppScreen.Config },
                             showNotificationPrompt = !notificationGrantedState.value,
+                            showBatteryPrompt = showBatteryPrompt,
                             versionLabel = versionLabel,
                             stLabel = if (viewModel.isCustomInstalled.value) {
                                 val customLabel = viewModel.customInstallLabel.value
@@ -394,6 +399,7 @@ class MainActivity : ComponentActivity() {
                             showAutoCheckOptInPrompt = showAutoCheckOptInPrompt,
                             onEnableAutoCheck = { viewModel.acceptAutoCheckOptInPrompt() },
                             onLaterAutoCheck = { viewModel.dismissAutoCheckOptInPrompt() },
+                            onDismissBatteryPrompt = { viewModel.dismissBatteryPrompt() },
                             showUpdatePrompt = showUpdatePrompt,
                             updateVersionLabel = viewModel.availableUpdateVersionLabel(),
                             updateDetails = viewModel.updateBannerMessage.value,
