@@ -8,12 +8,15 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
-import java.io.OutputStream
 import java.io.PushbackInputStream
-import java.nio.charset.StandardCharsets
+import java.util.Date
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
-import java.util.zip.ZipInputStream
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry
+import org.apache.commons.compress.archivers.zip.ZipArchiveInputStream
 
 object NodeBackup {
     private const val BACKUP_ROOT = "st_backup"
@@ -58,25 +61,30 @@ object NodeBackup {
             context.contentResolver.openOutputStream(uri)?.use { output ->
                 BufferedOutputStream(output).use { buffered ->
                     GZIPOutputStream(buffered).use { gz ->
-                        writeTarDirectory(gz, "$BACKUP_ROOT/")
-                        if (hasConfig) {
-                            writeTarFile(
-                                output = gz,
-                                name = "$BACKUP_ROOT/config.yaml",
-                                file = configFile
-                            ) { copied ->
-                                copiedBytes += copied
-                                report(context.getString(R.string.backup_progress_exporting))
+                        TarArchiveOutputStream(gz).use { tar ->
+                            tar.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX)
+                            tar.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX)
+                            tar.setAddPaxHeadersForNonAsciiNames(true)
+                            writeTarDirectory(tar, "$BACKUP_ROOT/")
+                            if (hasConfig) {
+                                writeTarFile(
+                                    output = tar,
+                                    name = "$BACKUP_ROOT/config.yaml",
+                                    file = configFile
+                                ) { copied ->
+                                    copiedBytes += copied
+                                    report(context.getString(R.string.backup_progress_exporting))
+                                }
                             }
-                        }
-                        if (dataDir.exists()) {
-                            writeTarDirectory(gz, "$BACKUP_ROOT/data/")
-                            writeTarTree(gz, dataDir, "$BACKUP_ROOT/data") { copied ->
-                                copiedBytes += copied
-                                report(context.getString(R.string.backup_progress_exporting))
+                            if (dataDir.exists()) {
+                                writeTarDirectory(tar, "$BACKUP_ROOT/data/", sourceDir = dataDir)
+                                writeTarTree(tar, dataDir, "$BACKUP_ROOT/data") { copied ->
+                                    copiedBytes += copied
+                                    report(context.getString(R.string.backup_progress_exporting))
+                                }
                             }
+                            tar.finish()
                         }
-                        finishTar(gz)
                     }
                 }
             } ?: throw IllegalStateException("Unable to open destination")
@@ -210,9 +218,10 @@ object NodeBackup {
         onProgressTick: () -> Unit = {}
     ) {
         try {
-            ZipInputStream(input).use { zis ->
-                var entry = zis.nextEntry
-                while (entry != null) {
+            ZipArchiveInputStream(input).use { zis ->
+                while (true) {
+                    val archiveEntry = zis.nextEntry ?: break
+                    val entry = archiveEntry as? ZipArchiveEntry ?: continue
                     if (entry.name.isNotEmpty()) {
                         val target = mapBackupPath(destDir, entry.name)
                         if (target != null) {
@@ -225,12 +234,8 @@ object NodeBackup {
                         }
                     }
                     onProgressTick()
-                    zis.closeEntry()
-                    entry = zis.nextEntry
                 }
             }
-        } catch (e: java.util.zip.ZipException) {
-            throw IllegalStateException("Not a valid ZIP archive: ${e.message}", e)
         } catch (e: IOException) {
             throw IllegalStateException("Unable to read ZIP archive: ${e.message}", e)
         }
@@ -242,56 +247,27 @@ object NodeBackup {
         onProgressTick: () -> Unit = {}
     ) {
         BufferedInputStream(input).use { stream ->
-            val header = ByteArray(512)
-            var pendingLongName: String? = null
-            while (true) {
-                if (!TarUtils.readFully(stream, header)) break
-                if (header.all { it == 0.toByte() }) break
-                val nameField = TarUtils.parseTarString(header, 0, 100)
-                val prefix = TarUtils.parseTarString(header, 345, 155)
-                val combined = if (prefix.isNotEmpty()) "$prefix/$nameField" else nameField
-                val entryName = pendingLongName ?: combined
-                pendingLongName = null
-                val size = TarUtils.parseTarNumeric(header, 124, 12)
-                val type = header[156].toInt().toChar()
+            TarArchiveInputStream(stream).use { tar ->
+                while (true) {
+                    val archiveEntry = tar.nextEntry ?: break
+                    val entry = archiveEntry as? TarArchiveEntry ?: continue
+                    val entryName = entry.name ?: continue
+                    val target = mapBackupPath(destDir, entryName) ?: continue
+                    when {
+                        entry.isDirectory -> {
+                            target.mkdirs()
+                            onProgressTick()
+                        }
 
-                if (type == 'x' || type == 'g') {
-                    val padding = (512 - (size % 512)) % 512
-                    TarUtils.skipFully(stream, size + padding)
-                    continue
-                }
-                if (type == 'L' || type == 'K') {
-                    val longName = TarUtils.readTarStringPayload(stream, size)
-                    val padding = (512 - (size % 512)) % 512
-                    if (padding > 0) {
-                        TarUtils.skipFully(stream, padding)
-                    }
-                    if (type == 'L' && longName.isNotEmpty()) {
-                        pendingLongName = longName
-                    }
-                    continue
-                }
-
-                val target = mapBackupPath(destDir, entryName)
-                if (target == null) {
-                    val padding = (512 - (size % 512)) % 512
-                    TarUtils.skipFully(stream, size + padding)
-                    continue
-                }
-
-                if (type == '5' || entryName.endsWith("/")) {
-                    target.mkdirs()
-                } else {
-                    target.parentFile?.mkdirs()
-                    FileOutputStream(target).use { output ->
-                        TarUtils.copyExact(stream, output, size)
+                        entry.isFile -> {
+                            target.parentFile?.mkdirs()
+                            FileOutputStream(target).use { output ->
+                                tar.copyTo(output)
+                            }
+                            onProgressTick()
+                        }
                     }
                 }
-                val padding = (512 - (size % 512)) % 512
-                if (padding > 0) {
-                    TarUtils.skipFully(stream, padding)
-                }
-                onProgressTick()
             }
         }
     }
@@ -311,11 +287,11 @@ object NodeBackup {
             stripped.startsWith("data/") -> stripped
             else -> return null
         }
-        return TarUtils.safeResolve(destDir, normalized)
+        return TarUtils.resolveArchiveEntryName(destDir, normalized)
     }
 
     private fun writeTarTree(
-        output: OutputStream,
+        output: TarArchiveOutputStream,
         root: File,
         baseName: String,
         onBytesCopied: (Long) -> Unit = {}
@@ -324,27 +300,39 @@ object NodeBackup {
         for (entry in entries) {
             val name = "$baseName/${entry.name}"
             if (entry.isDirectory) {
-                writeTarDirectory(output, "$name/")
+                writeTarDirectory(output, "$name/", sourceDir = entry)
                 writeTarTree(output, entry, name, onBytesCopied)
-            } else {
+            } else if (entry.isFile) {
                 writeTarFile(output, name, entry, onBytesCopied)
             }
         }
     }
 
-    private fun writeTarDirectory(output: OutputStream, name: String) {
+    private fun writeTarDirectory(
+        output: TarArchiveOutputStream,
+        name: String,
+        sourceDir: File? = null
+    ) {
         val normalized = if (name.endsWith("/")) name else "$name/"
-        writeTarHeader(output, normalized, 0, 493, '5')
+        val entry = TarArchiveEntry(normalized).apply {
+            mode = 493
+            size = 0L
+            modTime = Date(sourceDir?.lastModified()?.takeIf { it > 0L } ?: System.currentTimeMillis())
+        }
+        output.putArchiveEntry(entry)
+        output.closeArchiveEntry()
     }
 
     private fun writeTarFile(
-        output: OutputStream,
+        output: TarArchiveOutputStream,
         name: String,
         file: File,
         onBytesCopied: (Long) -> Unit = {}
     ) {
-        val size = file.length()
-        writeTarHeader(output, name, size, 420, '0')
+        val entry = TarArchiveEntry(file, name).apply {
+            mode = 420
+        }
+        output.putArchiveEntry(entry)
         file.inputStream().use { input ->
             val buffer = ByteArray(16 * 1024)
             while (true) {
@@ -354,79 +342,7 @@ object NodeBackup {
                 onBytesCopied(read.toLong())
             }
         }
-        val padding = (512 - (size % 512)) % 512
-        if (padding > 0) {
-            output.write(ByteArray(padding.toInt()))
-        }
-    }
-
-    private fun writeTarHeader(
-        output: OutputStream,
-        name: String,
-        size: Long,
-        mode: Int,
-        type: Char
-    ) {
-        val nameBytes = name.toByteArray(StandardCharsets.UTF_8)
-        if (nameBytes.size > 100) {
-            writeLongName(output, name)
-        }
-        val header = ByteArray(512)
-        writeString(header, 0, 100, name.take(100))
-        writeOctal(header, 100, 8, mode.toLong())
-        writeOctal(header, 108, 8, 0)
-        writeOctal(header, 116, 8, 0)
-        writeOctal(header, 124, 12, size)
-        writeOctal(header, 136, 12, System.currentTimeMillis() / 1000)
-        for (i in 148 until 156) {
-            header[i] = 0x20
-        }
-        header[156] = type.code.toByte()
-        writeString(header, 257, 6, "ustar")
-        writeString(header, 263, 2, "00")
-        writeString(header, 265, 32, "root")
-        writeString(header, 297, 32, "root")
-        val checksum = header.sumOf { it.toInt() and 0xFF }
-        writeOctal(header, 148, 8, checksum.toLong(), withTrailingNull = true)
-        output.write(header)
-    }
-
-    private fun writeLongName(output: OutputStream, name: String) {
-        val bytes = (name + "\u0000").toByteArray(StandardCharsets.UTF_8)
-        writeTarHeader(output, "././@LongLink", bytes.size.toLong(), 420, 'L')
-        output.write(bytes)
-        val padding = (512 - (bytes.size.toLong() % 512)) % 512
-        if (padding > 0) {
-            output.write(ByteArray(padding.toInt()))
-        }
-    }
-
-    private fun finishTar(output: OutputStream) {
-        output.write(ByteArray(1024))
-    }
-
-    private fun writeString(header: ByteArray, offset: Int, length: Int, value: String) {
-        val bytes = value.toByteArray(StandardCharsets.UTF_8)
-        val count = minOf(bytes.size, length)
-        System.arraycopy(bytes, 0, header, offset, count)
-    }
-
-    private fun writeOctal(
-        header: ByteArray,
-        offset: Int,
-        length: Int,
-        value: Long,
-        withTrailingNull: Boolean = false
-    ) {
-        val digits = java.lang.Long.toOctalString(value).padStart(length - 1, '0')
-        val bytes = digits.toByteArray(StandardCharsets.UTF_8)
-        val count = minOf(bytes.size, length - 1)
-        System.arraycopy(bytes, 0, header, offset + (length - 1 - count), count)
-        if (withTrailingNull) {
-            header[offset + length - 1] = 0
-        } else {
-            header[offset + length - 1] = 0x20
-        }
+        output.closeArchiveEntry()
     }
 
     private fun totalRegularFileBytes(root: File): Long {

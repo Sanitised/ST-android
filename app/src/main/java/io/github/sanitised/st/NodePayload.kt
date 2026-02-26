@@ -12,9 +12,12 @@ import java.nio.file.LinkOption
 import java.nio.file.Files
 import java.util.concurrent.TimeUnit
 import java.util.zip.GZIPInputStream
-import java.util.zip.ZipInputStream
 import kotlin.io.path.ExperimentalPathApi
 import kotlin.io.path.deleteRecursively
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry
+import org.apache.commons.compress.archivers.zip.ZipArchiveInputStream
 import org.json.JSONObject
 
 @OptIn(ExperimentalPathApi::class)
@@ -330,67 +333,29 @@ class NodePayload(private val context: Context) {
             } else {
                 BufferedInputStream(asset)
             }
-            var pendingLongName: String? = null
             inputStream.use { input ->
-                val header = ByteArray(512)
-                while (true) {
-                    if (!TarUtils.readFully(input, header)) {
-                        break
-                    }
-                    if (header.all { it == 0.toByte() }) {
-                        break
-                    }
-                    val nameField = TarUtils.parseTarString(header, 0, 100)
-                    val prefix = TarUtils.parseTarString(header, 345, 155)
-                    val combined = if (prefix.isNotEmpty()) "$prefix/$nameField" else nameField
-                    val name = pendingLongName ?: combined
-                    pendingLongName = null
-                    if (name.isEmpty()) {
-                        skipTarEntry(input, header)
-                        continue
-                    }
-                    val size = TarUtils.parseTarNumeric(header, 124, 12)
-                    val type = header[156].toInt().toChar()
-                    if (type == 'x' || type == 'g') {
-                        // Skip Pax/GNU extended headers.
-                        val padding = (512 - (size % 512)) % 512
-                        TarUtils.skipFully(input, size + padding)
-                        continue
-                    }
-                    if (type == 'L' || type == 'K') {
-                        // GNU long name/link for the next entry.
-                        val longName = TarUtils.readTarStringPayload(input, size)
-                        val padding = (512 - (size % 512)) % 512
-                        if (padding > 0) {
-                            TarUtils.skipFully(input, padding)
+                TarArchiveInputStream(input).use { tar ->
+                    while (true) {
+                        val archiveEntry = tar.nextEntry ?: break
+                        val entry = archiveEntry as? TarArchiveEntry ?: continue
+                        val name = entry.name ?: continue
+                        val target = TarUtils.resolveArchiveEntry(destDir, entry)
+                        when {
+                            entry.isDirectory -> {
+                                target.mkdirs()
+                            }
+
+                            entry.isFile -> {
+                                target.parentFile?.mkdirs()
+                                FileOutputStream(target).use { output ->
+                                    tar.copyTo(output)
+                                }
+                            }
                         }
-                        if (type == 'L' && longName.isNotEmpty()) {
-                            pendingLongName = longName
-                        }
-                        continue
-                    }
-                    val target = TarUtils.safeResolve(destDir, name)
-                    if (type == '5' || name.endsWith("/")) {
-                        target.mkdirs()
-                    } else {
-                        target.parentFile?.mkdirs()
-                        FileOutputStream(target).use { output ->
-                            TarUtils.copyExact(input, output, size)
-                        }
-                    }
-                    val padding = (512 - (size % 512)) % 512
-                    if (padding > 0) {
-                        TarUtils.skipFully(input, padding)
                     }
                 }
             }
         }
-    }
-
-    private fun skipTarEntry(input: InputStream, header: ByteArray) {
-        val size = TarUtils.parseTarNumeric(header, 124, 12)
-        val padding = (512 - (size % 512)) % 512
-        TarUtils.skipFully(input, size + padding)
     }
 
     // -------------------------------------------------------------------------
@@ -649,11 +614,12 @@ class NodePayload(private val context: Context) {
 
     private fun extractZipToDir(input: InputStream, destDir: File) {
         try {
-            ZipInputStream(BufferedInputStream(input)).use { zis ->
-                var entry = zis.nextEntry
-                while (entry != null) {
+            ZipArchiveInputStream(BufferedInputStream(input)).use { zis ->
+                while (true) {
+                    val archiveEntry = zis.nextEntry ?: break
+                    val entry = archiveEntry as? ZipArchiveEntry ?: continue
                     if (entry.name.isNotEmpty()) {
-                        val target = TarUtils.safeResolve(destDir, entry.name)
+                        val target = TarUtils.resolveArchiveEntry(destDir, entry)
                         if (entry.isDirectory) {
                             target.mkdirs()
                         } else {
@@ -661,12 +627,10 @@ class NodePayload(private val context: Context) {
                             FileOutputStream(target).use { out -> zis.copyTo(out) }
                         }
                     }
-                    zis.closeEntry()
-                    entry = zis.nextEntry
                 }
             }
-        } catch (e: java.util.zip.ZipException) {
-            throw IllegalStateException("Not a valid ZIP file: ${e.message}", e)
+        } catch (e: java.io.IOException) {
+            throw IllegalStateException("Unable to read ZIP file: ${e.message}", e)
         }
     }
 
