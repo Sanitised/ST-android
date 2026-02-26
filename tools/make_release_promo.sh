@@ -35,6 +35,10 @@ CARD_X=1040
 CARD_Y=118
 CARD_W=1280
 CARD_H=1782
+FINAL_CROP_X=75
+FINAL_CROP_Y=118
+FINAL_CROP_W=2245
+FINAL_CROP_H=1782
 
 FONT_REG="/usr/share/fonts/julietaula-montserrat-fonts/Montserrat-Regular.otf"
 FONT_MED="/usr/share/fonts/julietaula-montserrat-fonts/Montserrat-Medium.otf"
@@ -47,7 +51,7 @@ magick "$SCREENSHOT" -resize "${SHOT_W}x${SHOT_H}!" "$tmpdir/shot-resized.png"
 magick -size "${SHOT_W}x${SHOT_H}" xc:none \
   -fill white -draw "roundrectangle 0,0,$((SHOT_W-1)),$((SHOT_H-1)),46,46" \
   "$tmpdir/shot-mask.png"
-magick "$tmpdir/shot-resized.png" "$tmpdir/shot-mask.png" -alpha off -compose CopyOpacity -composite \
+magick "$tmpdir/shot-resized.png" -alpha set "$tmpdir/shot-mask.png" -compose CopyOpacity -composite \
   "$tmpdir/shot-rounded.png"
 magick -size "$((SHOT_W+22))x$((SHOT_H+22))" xc:none \
   -fill '#FFFFFF0E' -stroke '#D6C3FF80' -strokewidth 2 \
@@ -132,6 +136,7 @@ magick "$tmpdir/bg.png" \
   "$tmpdir/bullet-4.png" -geometry +1160+918 -compose over -composite \
   "$tmpdir/bullet-5.png" -geometry +1160+1038 -compose over -composite \
   "$tmpdir/bullet-6.png" -geometry +1160+1158 -compose over -composite \
+  -crop "${FINAL_CROP_W}x${FINAL_CROP_H}+${FINAL_CROP_X}+${FINAL_CROP_Y}" +repage \
   "$OUT_FILE"
 
 echo "Generated: $OUT_FILE"
