@@ -347,7 +347,7 @@ private fun STAndroidAppPreview() {
         onOpenNotificationSettings = {},
         onEditConfig = {},
         showNotificationPrompt = false,
-        versionLabel = "0.3.0-dev",
+        versionLabel = "0.3.1-dev",
         stLabel = "SillyTavern 1.12.3",
         nodeLabel = "Node v24.13.0",
         symlinkSupported = true,

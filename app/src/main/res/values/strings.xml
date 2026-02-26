@@ -105,6 +105,12 @@
     <string name="settings_auto_check_title">Automatically Check for Updates</string>
     <string name="settings_auto_open_subtitle">When the server is ready, open SillyTavern in your browser for you.</string>
     <string name="settings_auto_open_title">Open Browser Automatically</string>
+    <string name="settings_battery_button_enable">Set to Unrestricted</string>
+    <string name="settings_battery_button_review">Open Battery Settings</string>
+    <string name="settings_battery_status_optimized">Status: Optimized / restricted</string>
+    <string name="settings_battery_status_unrestricted">Status: Unrestricted</string>
+    <string name="settings_battery_subtitle">Android can stop background services to save power. Set this app to unrestricted to avoid random shutdowns.</string>
+    <string name="settings_battery_title">Background Battery</string>
     <string name="settings_channel_prerelease_label">Pre-release</string>
     <string name="settings_channel_prerelease_subtitle">Includes beta/rc builds</string>
     <string name="settings_channel_release_label">Release</string>
@@ -114,6 +120,7 @@
     <string name="settings_title">Settings</string>
     <string name="settings_update_channel_title">Update Channel</string>
     <string name="settings_update_description">Checks for new app releases on GitHub.</string>
+    <string name="settings_updates_title">App Updates</string>
     <string name="sillytavern_custom_version">SillyTavern (custom version)</string>
     <string name="sillytavern_custom_with_label">SillyTavern (%1$s)</string>
     <string name="sillytavern_label">SillyTavern %1$s</string>
