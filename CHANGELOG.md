@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.1
+
+- Added UI to set unrestricted battery use
+- Improved archive handling during import/export
+
 ## 0.3.0
 
 - Complete UI rework.

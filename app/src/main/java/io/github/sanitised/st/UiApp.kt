@@ -1,8 +1,6 @@
 package io.github.sanitised.st
 
-import android.app.Activity
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,19 +23,15 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.core.view.WindowInsetsControllerCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -56,8 +50,10 @@ fun STAndroidApp(
     onAutoOpenBrowserTriggered: () -> Unit,
     onShowLogs: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
+    onOpenBatterySettings: () -> Unit,
     onEditConfig: () -> Unit,
     showNotificationPrompt: Boolean,
+    showBatteryPrompt: Boolean,
     versionLabel: String,
     stLabel: String,
     nodeLabel: String,
@@ -66,6 +62,7 @@ fun STAndroidApp(
     showAutoCheckOptInPrompt: Boolean,
     onEnableAutoCheck: () -> Unit,
     onLaterAutoCheck: () -> Unit,
+    onDismissBatteryPrompt: () -> Unit,
     showUpdatePrompt: Boolean,
     updateVersionLabel: String,
     updateDetails: String,
@@ -92,15 +89,6 @@ fun STAndroidApp(
         val isBusy = busyMessage.isNotBlank()
         val readyState = remember { mutableStateOf(false) }
         val wasCanOpen = remember { mutableStateOf(false) }
-        val view = LocalView.current
-        val darkTheme = isSystemInDarkTheme()
-        val statusBarColor = MaterialTheme.colorScheme.background.toArgb()
-        SideEffect {
-            val activity = view.context as? Activity ?: return@SideEffect
-            val window = activity.window
-            window.statusBarColor = statusBarColor
-            WindowInsetsControllerCompat(window, view).isAppearanceLightStatusBars = !darkTheme
-        }
         LaunchedEffect(status.state, status.port) {
             if (status.state != NodeState.RUNNING) {
                 readyState.value = false
@@ -249,6 +237,14 @@ fun STAndroidApp(
                             onOpenSettings = onOpenNotificationSettings
                         )
                     }
+                    if (showBatteryPrompt) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        BatteryOptimizationCard(
+                            visible = true,
+                            onSet = onOpenBatterySettings,
+                            onDismiss = onDismissBatteryPrompt
+                        )
+                    }
                     if (showUpdatePrompt) {
                         Spacer(modifier = Modifier.height(16.dp))
                         UpdatePromptCard(
@@ -360,9 +356,11 @@ private fun STAndroidAppPreview() {
         onAutoOpenBrowserTriggered = {},
         onShowLogs = {},
         onOpenNotificationSettings = {},
+        onOpenBatterySettings = {},
         onEditConfig = {},
         showNotificationPrompt = false,
-        versionLabel = "0.3.0-dev",
+        showBatteryPrompt = false,
+        versionLabel = "0.3.1-dev",
         stLabel = "SillyTavern 1.12.3",
         nodeLabel = "Node v24.13.0",
         symlinkSupported = true,
@@ -370,6 +368,7 @@ private fun STAndroidAppPreview() {
         showAutoCheckOptInPrompt = false,
         onEnableAutoCheck = {},
         onLaterAutoCheck = {},
+        onDismissBatteryPrompt = {},
         showUpdatePrompt = false,
         updateVersionLabel = "",
         updateDetails = "",

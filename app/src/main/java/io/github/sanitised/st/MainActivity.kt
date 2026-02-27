@@ -9,11 +9,13 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
+import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -83,6 +85,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         maybeRequestNotificationPermission()
         val versionLabel = runCatching {
             val info = packageManager.getPackageInfo(packageName, 0)
@@ -116,6 +119,7 @@ class MainActivity : ComponentActivity() {
             val serviceState = remember { mutableStateOf("") }
             val pendingDialogState = remember { mutableStateOf<PendingDialog?>(null) }
             val notificationGrantedState = remember { mutableStateOf(isNotificationPermissionGranted()) }
+            val batteryUnrestrictedState = remember { mutableStateOf(isBatteryUnrestricted()) }
             val lifecycleOwner = LocalLifecycleOwner.current
             val scope = rememberCoroutineScope()
             val snackbarHostState = remember { SnackbarHostState() }
@@ -143,6 +147,7 @@ class MainActivity : ComponentActivity() {
                 val observer = LifecycleEventObserver { _, event ->
                     if (event == Lifecycle.Event.ON_RESUME) {
                         notificationGrantedState.value = isNotificationPermissionGranted()
+                        batteryUnrestrictedState.value = isBatteryUnrestricted()
                     }
                 }
                 lifecycleOwner.lifecycle.addObserver(observer)
@@ -177,6 +182,9 @@ class MainActivity : ComponentActivity() {
                 }
             }
             val showAutoCheckOptInPrompt = viewModel.shouldShowAutoCheckOptInPrompt()
+            val showBatteryPrompt = viewModel.shouldShowBatteryPrompt(
+                isBatteryUnrestricted = batteryUnrestrictedState.value
+            )
             val showUpdatePrompt = viewModel.shouldShowUpdatePrompt()
             val isUpdateReadyToInstall = viewModel.isAvailableUpdateDownloaded()
 
@@ -288,6 +296,8 @@ class MainActivity : ComponentActivity() {
                             onAutoCheckChanged = { enabled -> viewModel.setAutoCheckForUpdates(enabled) },
                             autoOpenBrowserEnabled = viewModel.autoOpenBrowserWhenReady.value,
                             onAutoOpenBrowserChanged = { enabled -> viewModel.setAutoOpenBrowserWhenReady(enabled) },
+                            isBatteryUnrestricted = batteryUnrestrictedState.value,
+                            onOpenBatterySettings = { openBatteryOptimizationSettings() },
                             channel = viewModel.updateChannel.value,
                             onChannelChanged = { channel -> viewModel.setUpdateChannel(channel) },
                             onCheckNow = { viewModel.checkForUpdates("manual") },
@@ -370,8 +380,10 @@ class MainActivity : ComponentActivity() {
                             onAutoOpenBrowserTriggered = { autoOpenBrowserTriggeredForCurrentRun.value = true },
                             onShowLogs = { currentScreen.value = AppScreen.Logs },
                             onOpenNotificationSettings = { openNotificationSettings() },
+                            onOpenBatterySettings = { openBatteryOptimizationSettings() },
                             onEditConfig = { currentScreen.value = AppScreen.Config },
                             showNotificationPrompt = !notificationGrantedState.value,
+                            showBatteryPrompt = showBatteryPrompt,
                             versionLabel = versionLabel,
                             stLabel = if (viewModel.isCustomInstalled.value) {
                                 val customLabel = viewModel.customInstallLabel.value
@@ -387,6 +399,7 @@ class MainActivity : ComponentActivity() {
                             showAutoCheckOptInPrompt = showAutoCheckOptInPrompt,
                             onEnableAutoCheck = { viewModel.acceptAutoCheckOptInPrompt() },
                             onLaterAutoCheck = { viewModel.dismissAutoCheckOptInPrompt() },
+                            onDismissBatteryPrompt = { viewModel.dismissBatteryPrompt() },
                             showUpdatePrompt = showUpdatePrompt,
                             updateVersionLabel = viewModel.availableUpdateVersionLabel(),
                             updateDetails = viewModel.updateBannerMessage.value,
@@ -546,6 +559,33 @@ class MainActivity : ComponentActivity() {
         startActivity(intent)
     }
 
+    private fun openBatteryOptimizationSettings() {
+        val packageUri = Uri.fromParts("package", packageName, null)
+        val powerManager = getSystemService(PowerManager::class.java)
+        val isIgnoringOptimizations = powerManager?.isIgnoringBatteryOptimizations(packageName) == true
+        val intentCandidates = listOf(
+            Intent("android.settings.APP_BATTERY_SETTINGS").apply {
+                data = packageUri
+                putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                putExtra("android.intent.extra.PACKAGE_NAME", packageName)
+                putExtra("package_name", packageName)
+            },
+            Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, packageUri)
+                .takeUnless { isIgnoringOptimizations },
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, packageUri),
+            Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS),
+            Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS),
+            Intent(Settings.ACTION_SETTINGS)
+        ).filterNotNull()
+
+        val intent = intentCandidates.firstOrNull { candidate ->
+            candidate.resolveActivity(packageManager) != null
+        } ?: Intent(Settings.ACTION_SETTINGS)
+
+        runCatching { startActivity(intent) }
+            .onFailure { runCatching { startActivity(Intent(Settings.ACTION_SETTINGS)) } }
+    }
+
     private fun openConfigDocs() {
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://docs.sillytavern.app/administration/config-yaml/"))
         startActivity(intent)
@@ -587,6 +627,11 @@ class MainActivity : ComponentActivity() {
         if (checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED) {
             notificationPermission.launch(permission)
         }
+    }
+
+    private fun isBatteryUnrestricted(): Boolean {
+        val powerManager = getSystemService(PowerManager::class.java) ?: return false
+        return powerManager.isIgnoringBatteryOptimizations(packageName)
     }
 
     private fun isSymlinkSupported(): Boolean {

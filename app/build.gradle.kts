@@ -3,7 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-val fallbackVersionName = "0.3.0"
+val fallbackVersionName = "0.3.1"
 
 android {
     namespace = "io.github.sanitised.st"
@@ -123,6 +123,7 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+    implementation("org.apache.commons:commons-compress:1.26.2")
     implementation("org.yaml:snakeyaml:2.2")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

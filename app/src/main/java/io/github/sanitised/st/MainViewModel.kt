@@ -46,6 +46,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         appendServiceLog = { message -> appendServiceLog(message) }
     )
 
+    private val batteryPromptManager = BatteryPromptManager(
+        application = application,
+        postUserMessage = { message -> postUserMessage(message) }
+    )
+
     val isCustomInstalled: MutableState<Boolean> = customInstallManager.isCustomInstalled
     val customInstallLabel: MutableState<String?> = customInstallManager.customInstallLabel
     val customRepoInput: MutableState<String> = customInstallManager.customRepoInput
@@ -183,6 +188,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun checkForUpdates(reason: String = "manual") {
         updateManager.checkForUpdates(reason)
+    }
+
+    fun shouldShowBatteryPrompt(isBatteryUnrestricted: Boolean): Boolean {
+        return batteryPromptManager.shouldShowPrompt(isBatteryUnrestricted)
+    }
+
+    fun dismissBatteryPrompt() {
+        batteryPromptManager.dismissPrompt()
     }
 
     fun showTransientMessage(message: String) {

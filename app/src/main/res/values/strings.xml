@@ -6,6 +6,10 @@
     <string name="auto_check_opt_in_body">We can check on app launch, no more than once per day.</string>
     <string name="auto_check_opt_in_title">Enable automatic update checks?</string>
     <string name="back">Back</string>
+    <string name="battery_prompt_body">Android may stop the background server to save battery. Set this app to unrestricted to reduce random shutdowns.</string>
+    <string name="battery_prompt_dismissed">If the server is shutting down in background, change battery mode to unrestricted in Settings.</string>
+    <string name="battery_prompt_set">Set</string>
+    <string name="battery_prompt_title">Keep Server Running in Background</string>
     <string name="busy_downloading_custom_source">Downloading custom ST source…</string>
     <string name="busy_exporting_data">Exporting data…</string>
     <string name="busy_importing_data">Importing data…</string>
@@ -105,6 +109,12 @@
     <string name="settings_auto_check_title">Automatically Check for Updates</string>
     <string name="settings_auto_open_subtitle">When the server is ready, open SillyTavern in your browser for you.</string>
     <string name="settings_auto_open_title">Open Browser Automatically</string>
+    <string name="settings_battery_button_enable">Set to Unrestricted</string>
+    <string name="settings_battery_button_review">Open Battery Settings</string>
+    <string name="settings_battery_status_optimized">Status: Optimized / restricted</string>
+    <string name="settings_battery_status_unrestricted">Status: Unrestricted</string>
+    <string name="settings_battery_subtitle">Android can stop background services to save power. Set this app to unrestricted to avoid random shutdowns.</string>
+    <string name="settings_battery_title">Background Battery</string>
     <string name="settings_channel_prerelease_label">Pre-release</string>
     <string name="settings_channel_prerelease_subtitle">Includes beta/rc builds</string>
     <string name="settings_channel_release_label">Release</string>
@@ -114,6 +124,7 @@
     <string name="settings_title">Settings</string>
     <string name="settings_update_channel_title">Update Channel</string>
     <string name="settings_update_description">Checks for new app releases on GitHub.</string>
+    <string name="settings_updates_title">App Updates</string>
     <string name="sillytavern_custom_version">SillyTavern (custom version)</string>
     <string name="sillytavern_custom_with_label">SillyTavern (%1$s)</string>
     <string name="sillytavern_label">SillyTavern %1$s</string>
