@@ -110,7 +110,7 @@
     <string name="settings_auto_open_subtitle">When the server is ready, open SillyTavern in your browser for you.</string>
     <string name="settings_auto_open_title">Open Browser Automatically</string>
     <string name="settings_dark_mode_title">Dark Mode</string>
-    <string name="settings_dark_mode_subtitle">Use a dark theme across the app for easier reading in low light.</string>
+    <string name="settings_dark_mode_subtitle">Use a dark theme across the app.</string>
     <string name="settings_battery_button_enable">Set to Unrestricted</string>
     <string name="settings_battery_button_review">Open Battery Settings</string>
     <string name="settings_battery_status_optimized">Status: Optimized / restricted</string>
