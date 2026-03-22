@@ -24,7 +24,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -38,6 +37,8 @@ fun SettingsScreen(
     onAutoCheckChanged: (Boolean) -> Unit,
     autoOpenBrowserEnabled: Boolean,
     onAutoOpenBrowserChanged: (Boolean) -> Unit,
+    darkModeEnabled: Boolean,
+    onDarkModeChanged: (Boolean) -> Unit,
     isBatteryUnrestricted: Boolean,
     onOpenBatterySettings: () -> Unit,
     channel: UpdateChannel,
@@ -77,6 +78,13 @@ fun SettingsScreen(
                     checked = autoOpenBrowserEnabled,
                     onCheckedChange = onAutoOpenBrowserChanged
                 )
+                Spacer(modifier = Modifier.height(16.dp))
+                SettingsToggleRow(
+                    title = stringResource(R.string.settings_dark_mode_title),
+                    subtitle = stringResource(R.string.settings_dark_mode_subtitle),
+                    checked = darkModeEnabled,
+                    onCheckedChange = onDarkModeChanged
+                )
                 Spacer(modifier = Modifier.height(20.dp))
                 Text(
                     text = stringResource(R.string.settings_battery_title),
@@ -91,9 +99,9 @@ fun SettingsScreen(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 val batteryStatusColor = if (isBatteryUnrestricted) {
-                    Color(0xFF2E7D32)
+                    MaterialTheme.colorScheme.primary
                 } else {
-                    Color(0xFFB26A00)
+                    MaterialTheme.colorScheme.error
                 }
                 val batteryStatusSymbol = if (isBatteryUnrestricted) "\u2713" else "!"
                 Row(
@@ -293,6 +301,8 @@ private fun SettingsScreenPreview() {
         onAutoCheckChanged = {},
         autoOpenBrowserEnabled = false,
         onAutoOpenBrowserChanged = {},
+        darkModeEnabled = false,
+        onDarkModeChanged = {},
         isBatteryUnrestricted = false,
         onOpenBatterySettings = {},
         channel = UpdateChannel.RELEASE,

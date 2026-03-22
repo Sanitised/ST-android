@@ -46,6 +46,7 @@ internal class UpdateManager(
         private const val UPDATE_PREFS_NAME = "updates"
         private const val PREF_AUTO_CHECK = "auto_check"
         private const val PREF_AUTO_OPEN_BROWSER = "auto_open_browser"
+        private const val PREF_DARK_MODE_ENABLED = "dark_mode_enabled"
         private const val PREF_CHANNEL = "channel"
         private const val PREF_FIRST_LAUNCH_MS = "first_launch_ms"
         private const val PREF_AUTO_OPTIN_PROMPT_SHOWN = "auto_optin_prompt_shown"
@@ -69,6 +70,9 @@ internal class UpdateManager(
     )
     val autoOpenBrowserWhenReady = mutableStateOf(
         updatePrefs.getBoolean(PREF_AUTO_OPEN_BROWSER, true)
+    )
+    val darkModeEnabled = mutableStateOf(
+        updatePrefs.getBoolean(PREF_DARK_MODE_ENABLED, false)
     )
     val updateChannel = mutableStateOf(
         resolveInitialUpdateChannel()
@@ -105,6 +109,11 @@ internal class UpdateManager(
     fun setAutoOpenBrowserWhenReady(enabled: Boolean) {
         autoOpenBrowserWhenReady.value = enabled
         updatePrefs.edit().putBoolean(PREF_AUTO_OPEN_BROWSER, enabled).apply()
+    }
+
+    fun setDarkModeEnabled(enabled: Boolean) {
+        darkModeEnabled.value = enabled
+        updatePrefs.edit().putBoolean(PREF_DARK_MODE_ENABLED, enabled).apply()
     }
 
     fun setUpdateChannel(channel: UpdateChannel) {

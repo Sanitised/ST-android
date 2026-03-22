@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -248,8 +249,15 @@ class MainActivity : ComponentActivity() {
                 )
             }
 
-            Box(modifier = Modifier.fillMaxSize()) {
-                when (val screen = currentScreen.value) {
+            MaterialTheme(
+                colorScheme = if (viewModel.darkModeEnabled.value) {
+                    androidx.compose.material3.darkColorScheme()
+                } else {
+                    androidx.compose.material3.lightColorScheme()
+                }
+            ) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    when (val screen = currentScreen.value) {
                     AppScreen.Logs -> {
                         BackHandler { currentScreen.value = AppScreen.Home }
                         LogsScreen(
@@ -296,6 +304,8 @@ class MainActivity : ComponentActivity() {
                             onAutoCheckChanged = { enabled -> viewModel.setAutoCheckForUpdates(enabled) },
                             autoOpenBrowserEnabled = viewModel.autoOpenBrowserWhenReady.value,
                             onAutoOpenBrowserChanged = { enabled -> viewModel.setAutoOpenBrowserWhenReady(enabled) },
+                            darkModeEnabled = viewModel.darkModeEnabled.value,
+                            onDarkModeChanged = { enabled -> viewModel.setDarkModeEnabled(enabled) },
                             isBatteryUnrestricted = batteryUnrestrictedState.value,
                             onOpenBatterySettings = { openBatteryOptimizationSettings() },
                             channel = viewModel.updateChannel.value,
@@ -431,93 +441,94 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                when (val dialog = pendingDialogState.value) {
-                    PendingDialog.ResetToDefault -> {
-                        androidx.compose.material3.AlertDialog(
-                            onDismissRequest = { pendingDialogState.value = null },
-                            title = { Text(text = stringResource(R.string.dialog_reset_title)) },
-                            text = {
-                                Text(
-                                    text = stringResource(R.string.dialog_reset_body)
-                                )
-                            },
-                            confirmButton = {
-                                Button(onClick = {
-                                    pendingDialogState.value = null
-                                    viewModel.resetToDefault()
-                                }) {
-                                    Text(text = stringResource(R.string.reset))
+                    when (val dialog = pendingDialogState.value) {
+                        PendingDialog.ResetToDefault -> {
+                            androidx.compose.material3.AlertDialog(
+                                onDismissRequest = { pendingDialogState.value = null },
+                                title = { Text(text = stringResource(R.string.dialog_reset_title)) },
+                                text = {
+                                    Text(
+                                        text = stringResource(R.string.dialog_reset_body)
+                                    )
+                                },
+                                confirmButton = {
+                                    Button(onClick = {
+                                        pendingDialogState.value = null
+                                        viewModel.resetToDefault()
+                                    }) {
+                                        Text(text = stringResource(R.string.reset))
+                                    }
+                                },
+                                dismissButton = {
+                                    Button(onClick = { pendingDialogState.value = null }) {
+                                        Text(text = stringResource(R.string.cancel))
+                                    }
                                 }
-                            },
-                            dismissButton = {
-                                Button(onClick = { pendingDialogState.value = null }) {
-                                    Text(text = stringResource(R.string.cancel))
+                            )
+                        }
+
+                        PendingDialog.RemoveUserData -> {
+                            androidx.compose.material3.AlertDialog(
+                                onDismissRequest = { pendingDialogState.value = null },
+                                title = { Text(text = stringResource(R.string.dialog_remove_data_title)) },
+                                text = {
+                                    Text(
+                                        text = stringResource(R.string.dialog_remove_data_body)
+                                    )
+                                },
+                                confirmButton = {
+                                    Button(onClick = {
+                                        pendingDialogState.value = null
+                                        viewModel.removeUserData()
+                                    }) {
+                                        Text(text = stringResource(R.string.remove))
+                                    }
+                                },
+                                dismissButton = {
+                                    Button(onClick = { pendingDialogState.value = null }) {
+                                        Text(text = stringResource(R.string.cancel))
+                                    }
                                 }
-                            }
-                        )
+                            )
+                        }
+
+                        is PendingDialog.ConfirmImport -> {
+                            androidx.compose.material3.AlertDialog(
+                                onDismissRequest = { pendingDialogState.value = null },
+                                title = { Text(text = stringResource(R.string.dialog_import_title)) },
+                                text = {
+                                    Text(
+                                        text = stringResource(R.string.dialog_import_body)
+                                    )
+                                },
+                                confirmButton = {
+                                    Button(onClick = {
+                                        val importUri = dialog.uri
+                                        pendingDialogState.value = null
+                                        viewModel.import(importUri)
+                                    }) {
+                                        Text(text = stringResource(R.string.import_action))
+                                    }
+                                },
+                                dismissButton = {
+                                    Button(onClick = { pendingDialogState.value = null }) {
+                                        Text(text = stringResource(R.string.cancel))
+                                    }
+                                }
+                            )
+                        }
+
+                        null -> Unit
                     }
 
-                    PendingDialog.RemoveUserData -> {
-                        androidx.compose.material3.AlertDialog(
-                            onDismissRequest = { pendingDialogState.value = null },
-                            title = { Text(text = stringResource(R.string.dialog_remove_data_title)) },
-                            text = {
-                                Text(
-                                    text = stringResource(R.string.dialog_remove_data_body)
-                                )
-                            },
-                            confirmButton = {
-                                Button(onClick = {
-                                    pendingDialogState.value = null
-                                    viewModel.removeUserData()
-                                }) {
-                                    Text(text = stringResource(R.string.remove))
-                                }
-                            },
-                            dismissButton = {
-                                Button(onClick = { pendingDialogState.value = null }) {
-                                    Text(text = stringResource(R.string.cancel))
-                                }
-                            }
-                        )
-                    }
-
-                    is PendingDialog.ConfirmImport -> {
-                        androidx.compose.material3.AlertDialog(
-                            onDismissRequest = { pendingDialogState.value = null },
-                            title = { Text(text = stringResource(R.string.dialog_import_title)) },
-                            text = {
-                                Text(
-                                    text = stringResource(R.string.dialog_import_body)
-                                )
-                            },
-                            confirmButton = {
-                                Button(onClick = {
-                                    val importUri = dialog.uri
-                                    pendingDialogState.value = null
-                                    viewModel.import(importUri)
-                                }) {
-                                    Text(text = stringResource(R.string.import_action))
-                                }
-                            },
-                            dismissButton = {
-                                Button(onClick = { pendingDialogState.value = null }) {
-                                    Text(text = stringResource(R.string.cancel))
-                                }
-                            }
-                        )
-                    }
-
-                    null -> Unit
+                    SnackbarHost(
+                        hostState = snackbarHostState,
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .statusBarsPadding()
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                    )
                 }
-
-                SnackbarHost(
-                    hostState = snackbarHostState,
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .statusBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
-                )
             }
         }
     }

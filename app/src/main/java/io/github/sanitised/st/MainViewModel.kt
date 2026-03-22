@@ -67,6 +67,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     val autoCheckForUpdates: MutableState<Boolean> = updateManager.autoCheckForUpdates
     val autoOpenBrowserWhenReady: MutableState<Boolean> = updateManager.autoOpenBrowserWhenReady
+    val darkModeEnabled: MutableState<Boolean> = updateManager.darkModeEnabled
     val updateChannel: MutableState<UpdateChannel> = updateManager.updateChannel
     val isCheckingForUpdates: MutableState<Boolean> = updateManager.isCheckingForUpdates
     val isDownloadingUpdate: MutableState<Boolean> = updateManager.isDownloadingUpdate
@@ -136,6 +137,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setAutoOpenBrowserWhenReady(enabled: Boolean) {
         updateManager.setAutoOpenBrowserWhenReady(enabled)
+    }
+
+    fun setDarkModeEnabled(enabled: Boolean) {
+        updateManager.setDarkModeEnabled(enabled)
     }
 
     fun setUpdateChannel(channel: UpdateChannel) {
