@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1
+
+- Updated the bundled SillyTavern to 1.18.0 and Node.js to v24.18.0 LTS.
+
 ## 0.4.0
 
 - Updated the bundled SillyTavern to 1.17.0, Node.js to v24.14.1.

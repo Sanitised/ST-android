@@ -1,7 +1,7 @@
 FROM ghcr.io/cirruslabs/android-sdk:36-ndk
 
 ARG GRADLE_VERSION=8.8
-ARG NODE_VERSION=24.13.0
+ARG NODE_VERSION=24.18.0
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \

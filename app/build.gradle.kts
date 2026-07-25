@@ -3,7 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-val fallbackVersionName = "0.4.0"
+val fallbackVersionName = "0.4.1-rc.1"
 
 android {
     namespace = "io.github.sanitised.st"
@@ -50,7 +50,7 @@ android {
             System.getenv("GITHUB_RUN_NUMBER")
         )
 
-        versionCode = versionCodeOverride?.toIntOrNull() ?: 2
+        versionCode = versionCodeOverride?.toIntOrNull() ?: 3
         versionName = versionNameOverride ?: fallbackVersionName
         vectorDrawables {
             useSupportLibrary = true

@@ -1,6 +1,8 @@
---- ./tools/v8_gypfiles/v8.gyp.orig	2025-05-08 13:56:23.000000000 +0530
-+++ ./tools/v8_gypfiles/v8.gyp	2025-05-09 19:46:24.096599118 +0530
-@@ -1309,7 +1309,7 @@
+diff --git a/tools/v8_gypfiles/v8.gyp b/tools/v8_gypfiles/v8.gyp
+index 74d5bd6a761..09959b62751 100644
+--- a/tools/v8_gypfiles/v8.gyp
++++ b/tools/v8_gypfiles/v8.gyp
+@@ -1324,7 +1324,7 @@
          # Platforms that don't have Compare-And-Swap (CAS) support need to link atomic library
          # to implement atomic memory access.
          # Clang needs it for some atomic operations (https://clang.llvm.org/docs/Toolchain.html#atomics-library).
@@ -9,7 +11,7 @@
            'link_settings': {
              'libraries': ['-latomic', ],
            },
-@@ -1448,6 +1448,7 @@
+@@ -1474,6 +1474,7 @@
              '<(V8_ROOT)/src/base/platform/platform-posix.h',
              '<(V8_ROOT)/src/base/platform/platform-posix-time.cc',
              '<(V8_ROOT)/src/base/platform/platform-posix-time.h',
