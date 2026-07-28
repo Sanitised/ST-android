@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.0
+
+- New feature to edit SillyTavern data folder with external file managers. Disabled by default.
+- Added a hold-to-activate to the data removal button.
+
 ## 0.4.1
 
 - Updated the bundled SillyTavern to 1.18.0 and Node.js to v24.18.0 LTS.
