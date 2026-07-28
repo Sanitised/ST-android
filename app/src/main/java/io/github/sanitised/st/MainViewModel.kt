@@ -73,6 +73,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val isDownloadingUpdate: MutableState<Boolean> = updateManager.isDownloadingUpdate
     val downloadProgressPercent: MutableState<Int?> = updateManager.downloadProgressPercent
     val updateBannerMessage: MutableState<String> = updateManager.updateBannerMessage
+    val externalFileAccessEnabled = mutableStateOf(
+        ExternalFileAccess.isEnabled(application)
+    )
+
+    init {
+        ExternalFileAccess.syncProviderComponent(application)
+    }
 
     override fun onCleared() {
         updateManager.onCleared()
@@ -129,6 +136,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun removeUserData() {
         customInstallManager.removeUserData()
+    }
+
+    fun setExternalFileAccessEnabled(enabled: Boolean) {
+        ExternalFileAccess.setEnabled(getApplication<Application>(), enabled)
+        externalFileAccessEnabled.value = enabled
     }
 
     fun setAutoCheckForUpdates(enabled: Boolean) {

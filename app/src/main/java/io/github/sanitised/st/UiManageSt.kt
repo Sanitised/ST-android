@@ -28,6 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
@@ -81,6 +82,9 @@ fun ManageStScreen(
     onCancelCustomOperation: () -> Unit,
     onLoadCustomZip: () -> Unit,
     onResetToDefault: () -> Unit,
+    externalFileAccessEnabled: Boolean,
+    onExternalFileAccessChanged: (Boolean) -> Unit,
+    onOpenExternalViewer: () -> Unit,
     onRemoveUserData: () -> Unit
 ) {
     val allRefsByKey = remember(allRefs) { allRefs.associateBy { it.key } }
@@ -168,6 +172,39 @@ fun ManageStScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.external_file_access_title),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = stringResource(R.string.external_file_access_description),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Switch(
+                            checked = externalFileAccessEnabled,
+                            onCheckedChange = onExternalFileAccessChanged
+                        )
+                    }
+                    if (externalFileAccessEnabled) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedButton(
+                            onClick = onOpenExternalViewer,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(text = stringResource(R.string.external_file_access_open))
+                        }
+                    }
                     Spacer(modifier = Modifier.height(12.dp))
                     OutlinedButton(
                         onClick = onRemoveUserData,
@@ -538,6 +575,9 @@ private fun ManageStScreenPreview() {
         onCancelCustomOperation = {},
         onLoadCustomZip = {},
         onResetToDefault = {},
+        externalFileAccessEnabled = true,
+        onExternalFileAccessChanged = {},
+        onOpenExternalViewer = {},
         onRemoveUserData = {}
     )
 }

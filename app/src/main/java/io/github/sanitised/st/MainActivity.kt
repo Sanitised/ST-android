@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.os.PowerManager
+import android.provider.DocumentsContract
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -469,6 +470,17 @@ class MainActivity : ComponentActivity() {
                                 )
                             },
                             onResetToDefault = { pendingDialogState.value = PendingDialog.ResetToDefault },
+                            externalFileAccessEnabled = viewModel.externalFileAccessEnabled.value,
+                            onExternalFileAccessChanged = { enabled ->
+                                viewModel.setExternalFileAccessEnabled(enabled)
+                            },
+                            onOpenExternalViewer = {
+                                if (!openExternalFileViewer()) {
+                                    viewModel.showTransientMessage(
+                                        getString(R.string.external_file_access_viewer_failed)
+                                    )
+                                }
+                            },
                             onRemoveUserData = { pendingDialogState.value = PendingDialog.RemoveUserData }
                         )
                     }
@@ -656,6 +668,21 @@ class MainActivity : ComponentActivity() {
     private fun openNodeUi(port: Int) {
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse("http://127.0.0.1:$port/"))
         startActivity(intent)
+    }
+
+    private fun openExternalFileViewer(): Boolean {
+        if (!ExternalFileAccess.isEnabled(this)) return false
+        val rootUri = DocumentsContract.buildRootUri(
+            ExternalFileAccess.authority(this),
+            SillyTavernDocumentsProvider.ROOT_ID
+        )
+        val intent = Intent(Intent.ACTION_VIEW, rootUri).apply {
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+        }
+        return runCatching {
+            startActivity(intent)
+            true
+        }.getOrDefault(false)
     }
 
     private fun openNotificationSettings() {

@@ -37,6 +37,11 @@
     <string name="dismiss">Dismiss</string>
     <string name="docs">Docs</string>
     <string name="enable">Enable</string>
+    <string name="external_file_access_description">Expose the SillyTavern data folder to Android’s system file picker. Other apps can modify or delete its files.</string>
+    <string name="external_file_access_open">Open in external viewer</string>
+    <string name="external_file_access_root_title">SillyTavern Data</string>
+    <string name="external_file_access_title">External file access</string>
+    <string name="external_file_access_viewer_failed">No compatible system file viewer is available.</string>
     <string name="import_action">Import</string>
     <string name="install">Install</string>
     <string name="install_now">Install now</string>

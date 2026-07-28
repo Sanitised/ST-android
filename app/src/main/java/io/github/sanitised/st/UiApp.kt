@@ -359,7 +359,7 @@ private fun STAndroidAppPreview() {
         onEditConfig = {},
         showNotificationPrompt = false,
         showBatteryPrompt = false,
-        versionLabel = "0.4.1-rc.1-dev",
+        versionLabel = "0.5.0-beta-dev",
         stLabel = "SillyTavern 1.18.0",
         nodeLabel = "Node v24.18.0",
         symlinkSupported = true,
