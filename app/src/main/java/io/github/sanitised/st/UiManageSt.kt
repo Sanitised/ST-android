@@ -1,6 +1,12 @@
 package io.github.sanitised.st
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,15 +37,28 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -47,6 +66,8 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 
 @Composable
 fun ManageStScreen(
@@ -166,12 +187,6 @@ fun ManageStScreen(
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = stringResource(R.string.manage_user_data_description),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -205,18 +220,11 @@ fun ManageStScreen(
                             Text(text = stringResource(R.string.external_file_access_open))
                         }
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedButton(
-                        onClick = onRemoveUserData,
+                    Spacer(modifier = Modifier.height(8.dp))
+                    HoldToRemoveButton(
                         enabled = buttonsEnabled,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(text = stringResource(R.string.manage_remove_all_user_data))
-                    }
+                        onHoldComplete = onRemoveUserData
+                    )
                     Spacer(modifier = Modifier.height(24.dp))
                     HorizontalDivider()
                     Spacer(modifier = Modifier.height(16.dp))
@@ -481,6 +489,103 @@ fun ManageStScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun HoldToRemoveButton(
+    enabled: Boolean,
+    onHoldComplete: () -> Unit
+) {
+    val progress = remember { Animatable(0f) }
+    val currentOnHoldComplete = rememberUpdatedState(onHoldComplete)
+    val hapticFeedback = LocalHapticFeedback.current
+    val label = stringResource(R.string.manage_remove_all_user_data)
+    val shape = MaterialTheme.shapes.extraLarge
+    val errorColor = MaterialTheme.colorScheme.error
+    val contentColor = if (enabled) errorColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+    val borderColor = if (enabled) errorColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+
+    LaunchedEffect(enabled) {
+        if (!enabled) progress.snapTo(0f)
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(ButtonDefaults.MinHeight)
+            .clip(shape)
+            .border(1.dp, borderColor, shape)
+            .semantics(mergeDescendants = true) {
+                role = Role.Button
+                if (enabled) {
+                    onLongClick(label = label) {
+                        currentOnHoldComplete.value()
+                        true
+                    }
+                } else {
+                    disabled()
+                }
+            }
+            .pointerInput(enabled) {
+                if (!enabled) return@pointerInput
+                coroutineScope {
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false).consume()
+                        val holdJob = launch {
+                            progress.snapTo(0f)
+                            progress.animateTo(
+                                targetValue = 1f,
+                                animationSpec = tween(
+                                    durationMillis = 2_000,
+                                    easing = LinearEasing
+                                )
+                            )
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                            progress.snapTo(0f)
+                            currentOnHoldComplete.value()
+                        }
+
+                        var pointerIsDown = true
+                        while (pointerIsDown) {
+                            val event = awaitPointerEvent()
+                            pointerIsDown = event.changes.any { change ->
+                                change.pressed &&
+                                    change.position.x in 0f..size.width.toFloat() &&
+                                    change.position.y in 0f..size.height.toFloat()
+                            }
+                            event.changes.forEach { it.consume() }
+                        }
+
+                        if (holdJob.isActive) {
+                            holdJob.cancel()
+                            launch {
+                                progress.animateTo(
+                                    targetValue = 0f,
+                                    animationSpec = tween(durationMillis = 150)
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .graphicsLayer {
+                    scaleX = progress.value
+                    transformOrigin = TransformOrigin(0f, 0.5f)
+                }
+                .background(errorColor.copy(alpha = 0.16f))
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = contentColor,
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }
 
