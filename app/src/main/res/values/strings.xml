@@ -37,6 +37,11 @@
     <string name="dismiss">Dismiss</string>
     <string name="docs">Docs</string>
     <string name="enable">Enable</string>
+    <string name="external_file_access_description">Browse and edit SillyTavern data in your file manager.</string>
+    <string name="external_file_access_open">Open SillyTavern data folder</string>
+    <string name="external_file_access_root_title">SillyTavern Data</string>
+    <string name="external_file_access_title">External file access</string>
+    <string name="external_file_access_viewer_failed">No compatible system file viewer is available.</string>
     <string name="import_action">Import</string>
     <string name="install">Install</string>
     <string name="install_now">Install now</string>
@@ -80,11 +85,10 @@
     <string name="manage_more_options_count">More options (%1$d)</string>
     <string name="manage_or_install_from_zip">Or install from ZIP</string>
     <string name="manage_quick_picks">Quick picks</string>
-    <string name="manage_remove_all_user_data">Remove All User Data</string>
+    <string name="manage_remove_all_user_data">Hold to Remove All User Data</string>
     <string name="manage_repo_label">Repository (owner/repo)</string>
     <string name="manage_reset_to_bundled">Reset to Bundled Version</string>
     <string name="manage_st_title">Manage ST</string>
-    <string name="manage_user_data_description">Permanently delete all chats, characters, presets, worlds, settings, and other user data stored by the app.</string>
     <string name="manage_user_data_title">User Data</string>
     <string name="manage_warning_backup">Back up your data first — use Export Data above.</string>
     <string name="manage_warning_body">Custom installs replace bundled code. Only install from repos you trust.</string>

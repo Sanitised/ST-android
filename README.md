@@ -27,6 +27,7 @@ It is intended primarily for basic on-device chatting. Extensions are not proper
 - Easily change SillyTavern: any version, branch, repo, or install from a ZIP archive. Not guaranteed to be compatible with something very exotic/outdated.
 - Dark/light mode support
 - Automatically opens the browser
+- Optional access to the SillyTavern data folder through external file managers.
 
 ## Installation
 
