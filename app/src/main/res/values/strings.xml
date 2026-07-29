@@ -37,7 +37,7 @@
     <string name="dismiss">Dismiss</string>
     <string name="docs">Docs</string>
     <string name="enable">Enable</string>
-    <string name="external_file_access_description">Browse and edit SillyTavern data in Android’s file picker.</string>
+    <string name="external_file_access_description">Browse and edit SillyTavern data in your file manager.</string>
     <string name="external_file_access_open">Open SillyTavern data folder</string>
     <string name="external_file_access_root_title">SillyTavern Data</string>
     <string name="external_file_access_title">External file access</string>
