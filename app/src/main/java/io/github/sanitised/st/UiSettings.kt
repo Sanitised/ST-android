@@ -385,7 +385,7 @@ private fun SettingsScreenPreview() {
         onCheckNow = {},
         isChecking = false,
         showUpdatePrompt = true,
-        updateVersionLabel = "v0.5.0",
+        updateVersionLabel = "v0.5.1",
         updateDetails = "Tap Install to download and install.",
         isDownloadingUpdate = false,
         downloadProgressPercent = null,

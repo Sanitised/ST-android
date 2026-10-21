@@ -3,7 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-val fallbackVersionName = "0.5.0"
+val fallbackVersionName = "0.5.1"
 
 android {
     namespace = "io.github.sanitised.st"
