@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.1
+
+- Updated the bundled SillyTavern to 1.19.0.
+- Updated Node.js to v24.22.1 LTS, including the October security fixes and removal of the compromised eMudhra intermediate CA.
+
 ## 0.5.0
 
 - New feature to edit SillyTavern data folder with external file managers. Disabled by default.
